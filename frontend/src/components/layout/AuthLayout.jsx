@@ -10,11 +10,11 @@ export default function AuthLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-fg transition-colors">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-30 h-[68px] w-full border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-sm transition-colors">
+      {/* ── Persistent Header Bar ── */}
+      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-xs transition-colors">
         <div className="flex h-full w-full items-center justify-between px-6 sm:px-10">
-          <div className="flex items-center gap-3">
-            <Link to="/" aria-label="DevCollab Home" className="flex items-center group">
+          <div className="flex items-center gap-3 shrink-0">
+            <Link to="/" aria-label="DevCollab Home" className="flex items-center group shrink-0 mr-1">
               <Logo size="md" />
             </Link>
 
@@ -22,7 +22,7 @@ export default function AuthLayout({
 
             <Link
               to="/"
-              className="flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold text-muted hover:text-fg border border-line bg-surface hover:bg-surface-2 transition cursor-pointer"
+              className="flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold bg-surface text-muted hover:text-fg border border-line hover:border-fg/30 hover:bg-surface-2 transition cursor-pointer select-none shrink-0"
             >
               <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />

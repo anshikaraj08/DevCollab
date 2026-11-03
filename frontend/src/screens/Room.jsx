@@ -9,6 +9,7 @@ import getErrorMessage from "../config/getErrorMessage";
 import PageLoader from "../components/PageLoader";
 import Logo from "../components/Logo";
 import ThemeToggle from "../components/ThemeToggle";
+import Avatar from "../components/ui/Avatar";
 import LanguageBadge, { LANGUAGES } from "../components/ui/LanguageBadge";
 import PresenceBar from "../components/room/PresenceBar";
 import ConnectionStatus from "../components/room/ConnectionStatus";
@@ -293,49 +294,49 @@ export default function Room() {
 
   return (
     <div className="flex flex-col h-screen bg-canvas transition-colors">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-30 flex items-center justify-between px-6 sm:px-10 h-[68px] shrink-0 border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-sm transition-colors">
+      {/* ── Persistent Header Bar ── */}
+      <header className="sticky top-0 z-30 flex items-center justify-between px-6 sm:px-10 h-[76px] shrink-0 border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-xs transition-colors">
 
-        {/* Left: Logo + nav pills + room info */}
+        {/* Left: Brand Logo + Persistent Nav Buttons (same exact spot on all pages) */}
         <div className="flex items-center gap-3 min-w-0">
-          <Link to="/dashboard" title="DevCollab" className="flex items-center group shrink-0 mr-2">
+          <Link to="/dashboard" title="DevCollab" className="flex items-center group shrink-0 mr-1">
             <Logo size="md" />
           </Link>
 
           <span className="h-5 w-px bg-line shrink-0" />
 
-          {/* Home */}
+          {/* Home Pill */}
           <Link
             to="/"
             title="Home"
-            className="hidden sm:flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold bg-surface text-muted hover:text-fg border border-line hover:border-fg/30 hover:bg-surface-2 transition cursor-pointer shrink-0"
+            className="flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold bg-surface text-muted hover:text-fg border border-line hover:border-fg/30 hover:bg-surface-2 transition cursor-pointer select-none shrink-0"
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
             </svg>
-            <span>Home</span>
+            <span className="hidden sm:inline">Home</span>
           </Link>
 
-          {/* Dashboard */}
+          {/* Dashboard Pill */}
           <Link
             to="/dashboard"
-            title="Dashboard"
-            className="hidden sm:flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold bg-surface text-muted hover:text-fg border border-line hover:border-fg/30 hover:bg-surface-2 transition cursor-pointer shrink-0"
+            title="Workspaces Dashboard"
+            className="flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold bg-surface text-muted hover:text-fg border border-line hover:border-fg/30 hover:bg-surface-2 transition cursor-pointer select-none shrink-0"
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4zm8-8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V4zm0 8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" clipRule="evenodd" />
             </svg>
-            <span>Dashboard</span>
+            <span className="hidden sm:inline">Dashboard</span>
           </Link>
 
-          {/* Divider + Room breadcrumb */}
-          <span className="hidden md:inline-block h-5 w-px bg-line shrink-0 mx-1" />
+          {/* Divider + Room title metadata */}
+          <span className="hidden md:inline-block h-5 w-px bg-line shrink-0 mx-0.5" />
           <h1 className="font-bold text-fg truncate text-xs sm:text-sm">{room.title}</h1>
           <LanguageBadge language={room.language} />
         </div>
 
-        {/* Right: presence + status + action buttons */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* Right: Presence + Status + Action Buttons + Avatar + ThemeToggle */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           {presence.length > 0 && <PresenceBar people={presence} />}
 
           <ConnectionStatus
@@ -347,7 +348,7 @@ export default function Room() {
           <button
             onClick={() => setCommentPanelOpen((o) => !o)}
             title="Code comments"
-            className={`flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold border transition cursor-pointer ${
+            className={`flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
               commentPanelOpen
                 ? "bg-fg text-canvas border-fg shadow-xs"
                 : "border-line text-muted hover:text-fg hover:border-fg/30 bg-surface hover:bg-surface-2"
@@ -363,7 +364,7 @@ export default function Room() {
           <button
             onClick={() => setSnapshotOpen(true)}
             title="Version snapshots"
-            className="flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold border border-line text-muted hover:text-fg hover:border-fg/30 bg-surface hover:bg-surface-2 transition cursor-pointer"
+            className="flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border border-line text-muted hover:text-fg hover:border-fg/30 bg-surface hover:bg-surface-2 transition cursor-pointer select-none"
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
@@ -376,7 +377,7 @@ export default function Room() {
             onClick={handleSave}
             disabled={saving}
             title="Save (Ctrl+S)"
-            className="flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold bg-surface border border-line text-fg hover:border-fg/40 hover:bg-surface-2 active:scale-95 transition cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold bg-surface border border-line text-fg hover:border-fg/40 hover:bg-surface-2 active:scale-95 transition cursor-pointer select-none disabled:opacity-50"
           >
             {savedFeedback ? (
               <>
@@ -402,7 +403,7 @@ export default function Room() {
           <button
             onClick={run}
             disabled={running}
-            className="flex items-center gap-1.5 h-9 px-5 rounded-full text-xs font-bold bg-primary text-primary-fg hover:opacity-90 active:scale-95 transition disabled:opacity-50 cursor-pointer shadow-xs"
+            className="flex items-center gap-1.5 h-9 px-4 sm:px-5 rounded-full text-xs font-bold bg-primary text-primary-fg hover:opacity-90 active:scale-95 transition disabled:opacity-50 cursor-pointer shadow-xs select-none"
           >
             {running ? (
               <>
@@ -420,6 +421,15 @@ export default function Room() {
               </>
             )}
           </button>
+
+          <span className="hidden sm:inline-block h-5 w-px bg-line shrink-0 mx-0.5" />
+
+          {/* User Avatar */}
+          {user && (
+            <div className="hidden sm:flex items-center">
+              <Avatar name={user.name} size="sm" />
+            </div>
+          )}
 
           <ThemeToggle />
         </div>

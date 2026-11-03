@@ -7,36 +7,34 @@ import { UserContext } from "../../context/user.context";
 import { useLogout } from "../../hooks/useLogout";
 import { cn } from "../../lib/cn";
 
-const NAV_PILL =
-  "flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold transition cursor-pointer border shrink-0 select-none";
-
 export default function AppLayout() {
   const { user } = useContext(UserContext);
   const logout = useLogout();
   const location = useLocation();
 
-  const isHome      = location.pathname === "/";
+  const isHome = location.pathname === "/";
   const isDashboard = location.pathname === "/dashboard";
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-fg transition-colors">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 h-[68px] w-full border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-sm transition-colors">
+      {/* ── Persistent Header Bar ── */}
+      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-xs transition-colors">
         <div className="flex h-full w-full items-center justify-between px-6 sm:px-10 gap-4">
 
-          {/* Left: Logo + nav pills */}
-          <div className="flex items-center gap-3">
-            <Link to="/dashboard" aria-label="DevCollab" className="flex items-center group shrink-0 mr-2">
+          {/* Left: Brand Logo + Persistent Nav Buttons (same exact spot on all pages) */}
+          <div className="flex items-center gap-3 shrink-0">
+            <Link to="/dashboard" aria-label="DevCollab" className="flex items-center group shrink-0 mr-1">
               <Logo size="md" />
             </Link>
 
-            {/* separator */}
             <span className="h-5 w-px bg-line shrink-0" />
 
-            {/* Home */}
+            {/* Home Pill */}
             <Link
               to="/"
-              className={cn(NAV_PILL,
+              title="Home"
+              className={cn(
+                "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border",
                 isHome
                   ? "bg-fg text-canvas border-fg shadow-xs"
                   : "bg-surface text-muted hover:text-fg border-line hover:border-fg/30 hover:bg-surface-2"
@@ -48,10 +46,12 @@ export default function AppLayout() {
               <span>Home</span>
             </Link>
 
-            {/* Dashboard */}
+            {/* Dashboard Pill */}
             <Link
               to="/dashboard"
-              className={cn(NAV_PILL,
+              title="Workspaces Dashboard"
+              className={cn(
+                "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border",
                 isDashboard
                   ? "bg-fg text-canvas border-fg shadow-xs"
                   : "bg-surface text-muted hover:text-fg border-line hover:border-fg/30 hover:bg-surface-2"
@@ -64,7 +64,7 @@ export default function AppLayout() {
             </Link>
           </div>
 
-          {/* Right: user info + log out + theme */}
+          {/* Right: User Profile + Log Out + ThemeToggle (consistent across pages) */}
           <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             {user && (
               <div className="flex items-center gap-2.5">
@@ -73,8 +73,9 @@ export default function AppLayout() {
               </div>
             )}
             <button
+              type="button"
               onClick={logout}
-              className="text-xs font-medium text-muted hover:text-fg transition cursor-pointer"
+              className="text-xs font-semibold text-muted hover:text-fg transition cursor-pointer"
             >
               Log out
             </button>
