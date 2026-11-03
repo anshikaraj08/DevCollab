@@ -7,6 +7,13 @@ import logger from "../utils/logger.js";
 // This file contains the main logic for creating rooms, listing rooms, joining rooms, saving code, and deleting rooms in DevCollab.
 const isMember = (room, userId) => room.users.some((id) => id.toString() === userId);
  
+export const getRoom = asyncHandler(async (req, res) => {
+  const room = await Room.findById(req.params.roomId);
+  if (!room) throw new ApiError(404, "Room not found");
+  if (!isMember(room, req.user.id)) throw new ApiError(403, "Forbidden");
+  res.json({ room });
+});
+
 export const createRoom = asyncHandler(async (req, res) => {
   const { title, language } = req.body; // already checked by Zod
   const room = await Room.create({//Room.create(...) saves the room in MongoDB.
