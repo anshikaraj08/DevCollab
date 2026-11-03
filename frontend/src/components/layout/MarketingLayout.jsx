@@ -19,13 +19,22 @@ export default function MarketingLayout() {
     <div className="flex min-h-screen flex-col bg-canvas text-fg">
       <header className="sticky top-0 z-30 border-b border-line bg-canvas/80 backdrop-blur">
         <PageContainer className="flex h-14 items-center justify-between gap-4">
-          <Link to="/" aria-label="DevCollab home"><Logo /></Link>
+          <div className="flex items-center gap-3">
+            <Link to="/" aria-label="DevCollab home" className="group">
+              <Logo />
+            </Link>
+          </div>
           <nav aria-label="Sections" className="hidden items-center gap-6 md:flex">
             {LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="text-sm text-muted transition hover:text-fg">
+              <a key={link.href} href={link.href} className="text-sm text-muted transition hover:text-fg font-medium">
                 {link.label}
               </a>
             ))}
+            {user && (
+              <Link to="/dashboard" className="text-sm font-semibold text-fg transition hover:opacity-80">
+                Dashboard
+              </Link>
+            )}
           </nav>
           <div className="flex items-center gap-2">
             <ThemeToggle />

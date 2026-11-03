@@ -14,9 +14,19 @@ export default function AuthLayout({
       {/* ── Top Bar ── */}
       <header className="border-b border-line bg-surface/80 backdrop-blur-sm">
         <PageContainer className="flex h-14 items-center justify-between">
-          <Link to="/" aria-label="DevCollab Home">
-            <Logo />
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/"
+              title="Back to home"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold text-muted hover:text-fg border border-line bg-surface-2 hover:bg-surface transition cursor-pointer"
+            >
+              <span>←</span>
+              <span>Home</span>
+            </Link>
+            <Link to="/" aria-label="DevCollab Home" className="group">
+              <Logo />
+            </Link>
+          </div>
           <ThemeToggle />
         </PageContainer>
       </header>

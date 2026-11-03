@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { UserContext } from "../context/user.context";
 import { useTheme } from "../context/theme.context";
@@ -16,6 +16,7 @@ import CommentPanel from "../components/room/CommentPanel";
 import SnapshotModal from "../components/room/SnapshotModal";
 
 // ── Monaco custom dark theme ──────────────────────────────────────────────────
+
 const defineTheme = (monaco) => {
   try {
     monaco.editor.defineTheme("devcollab", {
@@ -43,6 +44,7 @@ const defineTheme = (monaco) => {
 
 export default function Room() {
   const { roomId } = useParams();
+  const navigate = useNavigate();
   const { user } = useContext(UserContext);
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -294,12 +296,40 @@ export default function Room() {
     <div className="flex flex-col h-screen bg-canvas transition-colors">
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-5 h-14 shrink-0 border-b border-line bg-surface/90 backdrop-blur-md">
-        {/* Left: Logo (links to /dashboard) + divider + title + language badge */}
-        <div className="flex items-center gap-3 min-w-0">
-          <Link to="/dashboard" title="Back to workspaces" className="flex items-center hover:opacity-85 transition">
-            <Logo size="sm" />
+        {/* Left: Back button + Logo + Home & Dashboard links + title + language badge */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            title="Go back to previous page"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold text-muted hover:text-fg border border-line bg-surface-2 hover:bg-surface transition cursor-pointer shrink-0"
+          >
+            <span>←</span>
+            <span className="hidden sm:inline">Back</span>
+          </button>
+
+          <Link to="/dashboard" title="DevCollab Workspaces" className="flex items-center hover:opacity-85 transition shrink-0 group">
+            <Logo size="sm" showText={false} />
           </Link>
-          <span className="text-faint">/</span>
+
+          <div className="hidden lg:flex items-center gap-1 text-xs">
+            <Link
+              to="/"
+              className="px-2 py-1 rounded-md text-muted hover:text-fg hover:bg-surface-2 transition font-medium"
+            >
+              Home
+            </Link>
+            <span className="text-faint">/</span>
+            <Link
+              to="/dashboard"
+              className="px-2 py-1 rounded-md text-muted hover:text-fg hover:bg-surface-2 transition font-medium"
+            >
+              Dashboard
+            </Link>
+            <span className="text-faint">/</span>
+          </div>
+
+          <span className="text-faint lg:hidden">/</span>
           <h1 className="font-bold text-fg truncate text-xs sm:text-sm">{room.title}</h1>
           <LanguageBadge language={room.language} />
         </div>
