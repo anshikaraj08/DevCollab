@@ -176,7 +176,7 @@ export default function SnapshotModal({
                 original={diffCode}
                 modified={currentCode}
                 theme={monacoTheme}
-                beforeMount={isDark ? defineTheme : undefined}
+                beforeMount={defineTheme}
                 options={{
                   fontSize: 13,
                   fontFamily: "'JetBrains Mono', Consolas, monospace",

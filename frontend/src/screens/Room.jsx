@@ -2,8 +2,8 @@ import { useContext, useEffect, useRef, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { UserContext } from "../context/user.context";
+import { useTheme } from "../context/theme.context";
 import { useCollab } from "../hooks/useCollab";
-import { useIsDark } from "../hooks/useIsDark";
 import api from "../config/axios";
 import getErrorMessage from "../config/getErrorMessage";
 import PageLoader from "../components/PageLoader";
@@ -15,19 +15,27 @@ import ConnectionStatus from "../components/room/ConnectionStatus";
 import CommentPanel from "../components/room/CommentPanel";
 import SnapshotModal from "../components/room/SnapshotModal";
 
-// ── Monaco dark theme ──────────────────────────────────────────────────────────
+// ── Monaco custom dark theme ──────────────────────────────────────────────────
 const defineTheme = (monaco) => {
   try {
     monaco.editor.defineTheme("devcollab", {
       base: "vs-dark",
       inherit: true,
-      rules: [],
+      rules: [
+        { token: "comment", foreground: "6e7681", fontStyle: "italic" },
+        { token: "keyword", foreground: "ff7b72" },
+        { token: "string", foreground: "a5d6ff" },
+        { token: "number", foreground: "79c0ff" },
+        { token: "type", foreground: "ffa657" },
+      ],
       colors: {
-        "editor.background": "#1e1e1e",
-        "editorGutter.background": "#1e1e1e",
-        "editor.lineHighlightBackground": "#282828",
+        "editor.background": "#181818",
+        "editorGutter.background": "#181818",
+        "editor.lineHighlightBackground": "#222222",
         "editorLineNumber.foreground": "#6e7681",
-        "editorLineNumber.activeForeground": "#ffffff",
+        "editorLineNumber.activeForeground": "#eff2f6",
+        "editor.selectionBackground": "#333a42",
+        "editor.inactiveSelectionBackground": "#262b30",
       },
     });
   } catch (_) {}
@@ -36,12 +44,20 @@ const defineTheme = (monaco) => {
 export default function Room() {
   const { roomId } = useParams();
   const { user } = useContext(UserContext);
-  const isDark = useIsDark();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const collab = useCollab(roomId, user);
+
+  const monacoRef = useRef(null);
+  const editorRef = useRef(null);
 
   // Room metadata (title, language)
   const [room, setRoom] = useState(null);
   const [loadError, setLoadError] = useState("");
+
+  // Save state
+  const [saving, setSaving] = useState(false);
+  const [savedFeedback, setSavedFeedback] = useState(false);
 
   // Run / output state
   const [running, setRunning] = useState(false);
@@ -110,12 +126,52 @@ export default function Room() {
     };
   }, [collab?.socket]);
 
-  // Wire Monaco to Yjs collab
+  // Handle Save
+  const handleSave = async () => {
+    if (!collab || !room) return;
+    setSaving(true);
+    try {
+      const code = collab.ytext.toString();
+      await api.put(`/rooms/${roomId}/code`, { code });
+      setSavedFeedback(true);
+      setTimeout(() => setSavedFeedback(false), 2000);
+    } catch (err) {
+      console.error("Save error:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveRef = useRef(handleSave);
+  saveRef.current = handleSave;
+
+  // Dynamically update Monaco theme on dark/light switch
+  useEffect(() => {
+    if (monacoRef.current) {
+      defineTheme(monacoRef.current);
+      monacoRef.current.editor.setTheme(isDark ? "devcollab" : "vs");
+    }
+  }, [isDark]);
+
+  // Before mount: define custom theme
+  const handleBeforeMount = (monaco) => {
+    monacoRef.current = monaco;
+    defineTheme(monaco);
+  };
+
+  // On mount: wire Monaco to Yjs collab & keybindings
   const onMount = useCallback(
     (editor, monaco) => {
-      if (isDark) defineTheme(monaco);
+      editorRef.current = editor;
+      monacoRef.current = monaco;
+      defineTheme(monaco);
       monaco.editor.setTheme(isDark ? "devcollab" : "vs");
       if (collab) collab.attachEditor(editor, monaco);
+
+      // Bind Ctrl+S / Cmd+S
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+        saveRef.current?.();
+      });
     },
     [collab, isDark]
   );
@@ -182,7 +238,6 @@ export default function Room() {
   };
   const handleLoadSnapshot = (code) => {
     if (!collab || !code) return;
-    // Replace ytext content
     const doc = collab.doc;
     const ytext = collab.ytext;
     doc.transact(() => {
@@ -228,7 +283,7 @@ export default function Room() {
         </div>
 
         {/* Right: presence + status + actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           {/* Presence avatars */}
           {presence.length > 0 && <PresenceBar people={presence} />}
 
@@ -241,6 +296,7 @@ export default function Room() {
           {/* Comments toggle */}
           <button
             onClick={() => setCommentPanelOpen((o) => !o)}
+            title="Code comments"
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
               commentPanelOpen
                 ? "border-primary text-primary bg-primary/10"
@@ -248,7 +304,7 @@ export default function Room() {
             }`}
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
             </svg>
             {openComments > 0 && <span>{openComments}</span>}
           </button>
@@ -256,30 +312,58 @@ export default function Room() {
           {/* Snapshots toggle */}
           <button
             onClick={() => setSnapshotOpen(true)}
+            title="Version snapshots"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-line text-muted hover:text-fg hover:border-fg/30 transition"
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v10H4V5zm2 2v2h8V7H6zm0 4v2h5v-2H6z" />
             </svg>
-            Snapshots
+            <span className="hidden sm:inline">Snapshots</span>
+          </button>
+
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            disabled={saving || !collab}
+            title="Save code (Ctrl+S)"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold bg-surface-2 border border-line text-fg hover:border-fg/40 active:scale-95 transition disabled:opacity-50"
+          >
+            {savedFeedback ? (
+              <>
+                <svg className="size-3 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="text-emerald-500">Saved</span>
+              </>
+            ) : saving ? (
+              <span>Saving…</span>
+            ) : (
+              <>
+                <svg className="size-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6a1 1 0 10-2 0v5.586l-1.293-1.293z" />
+                  <path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm2 1v8h10V6H5z" />
+                </svg>
+                <span>Save</span>
+              </>
+            )}
           </button>
 
           {/* Run button */}
           <button
             onClick={run}
             disabled={running || !collab}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold border border-line text-fg hover:bg-surface-2 transition disabled:opacity-50 group ${lang.hover ?? ""}`}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-fg hover:opacity-90 active:scale-95 transition disabled:opacity-50 group shadow-xs`}
           >
             {running ? (
               <>
-                <svg className="animate-spin size-3 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="animate-spin size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                 </svg>
                 <span>Running…</span>
               </>
             ) : (
               <>
-                <svg width="9" height="11" viewBox="0 0 10 12" fill="currentColor" className={`transition-colors group-hover:${lang.dot ? lang.dot.replace("bg-", "text-") : "text-fg"}`}>
+                <svg width="9" height="11" viewBox="0 0 10 12" fill="currentColor">
                   <path d="M1 1l8 5-8 5V1z" />
                 </svg>
                 <span>Run</span>
@@ -295,9 +379,9 @@ export default function Room() {
       <div className="flex flex-1 min-h-0 mx-4 my-3 gap-3">
 
         {/* Editor frame */}
-        <div className="flex flex-col flex-1 min-w-0 rounded-2xl overflow-hidden border border-line shadow-lg bg-[#1e1e1e]">
-          {/* Window chrome */}
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-surface border-b border-line shrink-0">
+        <div className="flex flex-col flex-1 min-w-0 rounded-2xl overflow-hidden border border-line shadow-lg bg-surface">
+          {/* Window chrome topbar */}
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-surface-2 border-b border-line shrink-0">
             <div className="flex gap-1.5">
               <span className="size-2.5 rounded-full bg-[#ff5f56]" />
               <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
@@ -309,12 +393,13 @@ export default function Room() {
             </div>
           </div>
 
-          {/* Monaco */}
-          <div className="flex-1 min-h-0">
+          {/* Monaco Editor */}
+          <div className="flex-1 min-h-0 bg-canvas">
             <Editor
               height="100%"
               theme={isDark ? "devcollab" : "vs"}
-              beforeMount={isDark ? defineTheme : undefined}
+              beforeMount={handleBeforeMount}
+              onMount={onMount}
               language={room.language}
               options={{
                 fontSize: 14,
@@ -324,7 +409,6 @@ export default function Room() {
                 scrollBeyondLastLine: false,
                 glyphMargin: true,
               }}
-              onMount={onMount}
             />
           </div>
         </div>
@@ -345,7 +429,7 @@ export default function Room() {
         {panelOpen && (
           <div className="flex flex-col w-80 shrink-0 rounded-2xl overflow-hidden border border-line bg-surface shadow-xl">
             {/* Panel header */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas shrink-0">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-surface-2 shrink-0">
               <div className="flex items-center gap-2">
                 <span className={`size-2 rounded-full ${lang.dot ?? "bg-faint"}`} />
                 <span className="text-[11px] font-mono font-bold text-fg uppercase tracking-wider">Console</span>
