@@ -5,6 +5,8 @@ const roomSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     language: { type: String, default: "javascript" },
     code: { type: String, default: "" },
+    // Phase 2: the saved Yjs document. Hidden from normal queries because it is large.
+    yState: { type: Buffer, select: false },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     users: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
