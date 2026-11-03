@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import Logo from "../Logo";
 import ThemeToggle from "../ThemeToggle";
-import PageContainer from "./PageContainer";
 
 export default function AuthLayout({
   title = "Welcome back!",
@@ -11,24 +10,26 @@ export default function AuthLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-fg transition-colors">
-      {/* ── Top Bar ── */}
-      <header className="border-b border-line bg-surface/80 backdrop-blur-sm">
-        <PageContainer className="flex h-14 items-center justify-between">
-          <div className="flex items-center gap-3">
+      {/* ── Consistent Full-Width Header Bar ── */}
+      <header className="sticky top-0 z-30 h-16 w-full border-b border-line bg-surface/95 backdrop-blur-md shadow-xs transition-colors">
+        <div className="flex h-full w-full items-center justify-between px-5 sm:px-8">
+          <div className="flex items-center gap-3.5">
+            <Link to="/" aria-label="DevCollab Home" className="flex items-center group">
+              <Logo size="md" />
+            </Link>
+
             <Link
               to="/"
               title="Back to home"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold text-muted hover:text-fg border border-line bg-surface-2 hover:bg-surface transition cursor-pointer"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-muted hover:text-fg border border-line bg-surface-2 hover:bg-surface transition cursor-pointer"
             >
               <span>←</span>
               <span>Home</span>
             </Link>
-            <Link to="/" aria-label="DevCollab Home" className="group">
-              <Logo />
-            </Link>
           </div>
+
           <ThemeToggle />
-        </PageContainer>
+        </div>
       </header>
 
       {/* ── Main Mockup Window ── */}
@@ -166,19 +167,12 @@ export default function AuthLayout({
                   />
 
                   {/* Meditating Figure */}
-                  {/* Head & hair */}
                   <circle cx="100" cy="50" r="14" className="stroke-fg" />
                   <path d="M88 48 Q100 40 112 48" className="stroke-fg" />
-
-                  {/* Body & arms in zen pose */}
                   <path d="M100 64 L100 105" className="stroke-fg" />
                   <path d="M100 75 Q75 80 68 98 Q75 106 88 105" className="stroke-fg" />
                   <path d="M100 75 Q125 80 132 98 Q125 106 112 105" className="stroke-fg" />
-
-                  {/* Crossed legs */}
                   <path d="M88 105 Q65 115 55 130 Q80 135 100 125 Q120 135 145 130 Q135 115 112 105" className="stroke-fg" />
-
-                  {/* Lotus base */}
                   <path d="M70 135 Q100 142 130 135" className="stroke-line" />
                 </svg>
 

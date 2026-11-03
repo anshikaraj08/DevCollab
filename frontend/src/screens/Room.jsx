@@ -295,34 +295,34 @@ export default function Room() {
   return (
     <div className="flex flex-col h-screen bg-canvas transition-colors">
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-5 h-14 shrink-0 border-b border-line bg-surface/90 backdrop-blur-md">
-        {/* Left: Back button + Logo + Home & Dashboard links + title + language badge */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <header className="sticky top-0 z-30 flex items-center justify-between px-5 sm:px-8 h-16 shrink-0 border-b border-line bg-surface/95 backdrop-blur-md shadow-xs transition-colors">
+        {/* Left: Brand Logo in corner + Back button + Home/Dashboard navigation + title + badge */}
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+          <Link to="/dashboard" title="DevCollab Workspaces" className="flex items-center hover:opacity-85 transition shrink-0 group">
+            <Logo size="md" />
+          </Link>
+
           <button
             type="button"
             onClick={() => navigate(-1)}
             title="Go back to previous page"
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold text-muted hover:text-fg border border-line bg-surface-2 hover:bg-surface transition cursor-pointer shrink-0"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-muted hover:text-fg border border-line bg-surface-2 hover:bg-surface transition cursor-pointer shrink-0"
           >
             <span>←</span>
             <span className="hidden sm:inline">Back</span>
           </button>
 
-          <Link to="/dashboard" title="DevCollab Workspaces" className="flex items-center hover:opacity-85 transition shrink-0 group">
-            <Logo size="sm" showText={false} />
-          </Link>
-
           <div className="hidden lg:flex items-center gap-1 text-xs">
             <Link
               to="/"
-              className="px-2 py-1 rounded-md text-muted hover:text-fg hover:bg-surface-2 transition font-medium"
+              className="px-2.5 py-1 rounded-full text-muted hover:text-fg hover:bg-surface-2 transition font-medium"
             >
               Home
             </Link>
             <span className="text-faint">/</span>
             <Link
               to="/dashboard"
-              className="px-2 py-1 rounded-md text-muted hover:text-fg hover:bg-surface-2 transition font-medium"
+              className="px-2.5 py-1 rounded-full text-muted hover:text-fg hover:bg-surface-2 transition font-medium"
             >
               Dashboard
             </Link>
