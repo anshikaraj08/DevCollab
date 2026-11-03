@@ -131,72 +131,117 @@ export default function AuthLayout({
               )}
             </div>
 
-            {/* Right Column: Zen Dev Illustration & Card */}
-            <div className="hidden md:flex flex-col justify-between items-center rounded-2xl border border-line bg-surface-2/60 p-8 min-h-[440px] text-center relative overflow-hidden">
-              {/* Floating avatar top left */}
-              <div className="absolute top-6 left-6 flex size-9 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 font-bold text-xs shadow-xs">
-                A
-              </div>
-
-              {/* Floating avatar top right */}
-              <div className="absolute top-8 right-6 flex size-8 items-center justify-center rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-500 font-bold text-xs shadow-xs">
-                J
-              </div>
-
-              {/* Zen Meditating Coder SVG Illustration */}
-              <div className="my-auto flex flex-col items-center justify-center pt-4">
-                <svg
-                  className="w-48 h-48 text-fg"
-                  viewBox="0 0 200 200"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path
-                    d="M50 110 C40 100 45 80 60 75 C65 55 90 50 105 60 C120 48 145 55 148 75 C165 80 168 100 155 115"
-                    className="stroke-line"
-                    strokeWidth="1.5"
-                    strokeDasharray="4 4"
-                  />
-                  <path
-                    d="M100 85 C95 78 85 80 85 88 C85 96 100 104 100 104 C100 104 115 96 115 88 C115 80 105 78 100 85 Z"
-                    className="fill-emerald-500/20 stroke-emerald-500"
-                    strokeWidth="1.5"
-                  />
-                  <circle cx="100" cy="50" r="14" className="stroke-fg" />
-                  <path d="M88 48 Q100 40 112 48" className="stroke-fg" />
-                  <path d="M100 64 L100 105" className="stroke-fg" />
-                  <path d="M100 75 Q75 80 68 98 Q75 106 88 105" className="stroke-fg" />
-                  <path d="M100 75 Q125 80 132 98 Q125 106 112 105" className="stroke-fg" />
-                  <path d="M88 105 Q65 115 55 130 Q80 135 100 125 Q120 135 145 130 Q135 115 112 105" className="stroke-fg" />
-                  <path d="M70 135 Q100 142 130 135" className="stroke-line" />
-                </svg>
-
-                {/* Floating Preview Card */}
-                <div className="mt-2 rounded-xl border border-line bg-surface p-3 shadow-lg flex items-center justify-between gap-4 max-w-xs text-left">
-                  <div>
-                    <h4 className="text-xs font-bold text-fg">Code Review</h4>
-                    <p className="text-[10px] text-muted font-mono mt-0.5">10 Tasks &bull; 84% Resolved</p>
-                  </div>
-                  <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-500">
-                    Live
+            {/* Right Column: Live Collaborative Coding Session Showcase */}
+            <div className="hidden md:flex flex-col justify-between rounded-2xl border border-line bg-surface-2/60 p-6 min-h-[460px] relative overflow-hidden">
+              
+              {/* Header Badge */}
+              <div className="flex items-center justify-between w-full mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[11px] font-mono font-bold text-fg uppercase tracking-wider">Live Multiplayer Room</span>
+                </div>
+                <div className="flex items-center -space-x-1.5">
+                  <span className="size-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] flex items-center justify-center shadow-xs">
+                    A
+                  </span>
+                  <span className="size-6 rounded-full bg-sky-500/20 border border-sky-500/40 text-sky-600 dark:text-sky-400 font-bold text-[10px] flex items-center justify-center shadow-xs">
+                    J
                   </span>
                 </div>
               </div>
 
-              {/* Bottom Carousel Dots + Quote */}
-              <div className="w-full pt-4 space-y-3">
-                <div className="flex justify-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-fg" />
-                  <span className="size-1.5 rounded-full bg-line-strong" />
+              {/* Collaborative Code Editor Window Mockup */}
+              <div className="w-full rounded-xl border border-line bg-surface shadow-xl overflow-hidden text-left font-mono my-auto">
+                {/* Editor Window Topbar */}
+                <div className="flex items-center justify-between px-3 py-2 border-b border-line bg-surface-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full bg-[#ff5f56]" />
+                    <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
+                    <span className="size-2.5 rounded-full bg-[#27c93f]" />
+                    <span className="text-[10px] font-semibold text-muted ml-2">binarySearch.js</span>
+                  </div>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    2 Peers Connected
+                  </span>
+                </div>
+
+                {/* Editor Lines with Multi-User Cursors */}
+                <div className="p-3.5 text-[11px] leading-relaxed space-y-1 bg-canvas/60">
+                  <div className="flex items-center gap-3 text-muted/60">
+                    <span className="w-3 text-right select-none text-[10px]">1</span>
+                    <span className="text-fg"><span className="text-purple-500 font-semibold">function</span> <span className="text-sky-500">search</span>(arr, target) &#123;</span>
+                  </div>
+
+                  {/* Line 2 with Anshika's Multiplayer Cursor */}
+                  <div className="flex items-center gap-3 relative bg-emerald-500/10 -mx-3.5 px-3.5 py-0.5 rounded">
+                    <span className="w-3 text-right select-none text-[10px] text-emerald-600 font-bold">2</span>
+                    <span className="text-fg flex items-center">
+                      &nbsp;&nbsp;<span className="text-purple-500 font-semibold">let</span> left = <span className="text-amber-500">0</span>, right = arr.length - <span className="text-amber-500">1</span>;
+                      {/* Anshika Cursor & Tag */}
+                      <span className="relative inline-flex items-center ml-0.5">
+                        <span className="w-[2px] h-3.5 bg-emerald-500 animate-pulse inline-block" />
+                        <span className="absolute -top-4 left-0 px-1.5 py-0.2 rounded bg-emerald-500 text-white font-sans text-[8px] font-bold shadow-xs whitespace-nowrap">
+                          Anshika
+                        </span>
+                      </span>
+                    </span>
+                  </div>
+
+                  {/* Line 3 with John's Multiplayer Cursor */}
+                  <div className="flex items-center gap-3 relative bg-sky-500/10 -mx-3.5 px-3.5 py-0.5 rounded">
+                    <span className="w-3 text-right select-none text-[10px] text-sky-600 font-bold">3</span>
+                    <span className="text-fg flex items-center">
+                      &nbsp;&nbsp;<span className="text-purple-500 font-semibold">while</span> (left &lt;= right) &#123;
+                      {/* John Cursor & Tag */}
+                      <span className="relative inline-flex items-center ml-0.5">
+                        <span className="w-[2px] h-3.5 bg-sky-500 animate-pulse inline-block" />
+                        <span className="absolute -top-4 left-0 px-1.5 py-0.2 rounded bg-sky-500 text-white font-sans text-[8px] font-bold shadow-xs whitespace-nowrap">
+                          John
+                        </span>
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-muted/60">
+                    <span className="w-3 text-right select-none text-[10px]">4</span>
+                    <span className="text-fg">&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-purple-500 font-semibold">const</span> mid = Math.floor((left + right) / <span className="text-amber-500">2</span>);</span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-muted/60">
+                    <span className="w-3 text-right select-none text-[10px]">5</span>
+                    <span className="text-fg">&nbsp;&nbsp;&#125;</span>
+                  </div>
+                </div>
+
+                {/* Live Peer Review Comment Box */}
+                <div className="p-2.5 border-t border-line bg-surface-2/80 flex items-start gap-2.5">
+                  <div className="size-5 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    A
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-fg">Anshika Raj</span>
+                      <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold">Line 3 &bull; Reviewed</span>
+                    </div>
+                    <p className="text-[10px] text-muted font-sans mt-0.5 leading-tight">
+                      &ldquo;Logic looks optimal. Ready to run and compile!&rdquo;
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Quote & Collaboration Tag */}
+              <div className="w-full pt-4 text-center">
+                <div className="flex justify-center gap-1.5 mb-2">
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                  <span className="size-1.5 rounded-full bg-sky-500" />
                   <span className="size-1.5 rounded-full bg-line-strong" />
                 </div>
                 <p className="text-xs font-medium text-fg max-w-xs mx-auto leading-relaxed">
-                  Make your code review easier and organized with <span className="font-bold">DevCollab</span>
+                  Real-time multiplayer coding, shared rooms, and inline reviews with <span className="font-bold text-emerald-600 dark:text-emerald-400">DevCollab</span>
                 </p>
               </div>
+
             </div>
 
           </div>
