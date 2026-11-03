@@ -272,12 +272,37 @@ export default function Room() {
     <div className="flex flex-col h-screen bg-canvas transition-colors">
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-5 h-14 shrink-0 border-b border-line bg-surface/90 backdrop-blur-md">
-        {/* Left: Logo + breadcrumb + language badge */}
-        <div className="flex items-center gap-3 min-w-0">
-          <Link to="/dashboard">
+        {/* Left: Logo + Home link + Workspaces link + title + badge */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <Link to="/" title="Go to DevCollab Home" className="flex items-center hover:opacity-80 transition">
             <Logo size="sm" />
           </Link>
-          <span className="text-faint">/</span>
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <Link
+              to="/"
+              title="Home"
+              className="flex items-center gap-1 text-muted hover:text-fg font-medium px-2 py-1 rounded-md hover:bg-surface-2 transition"
+            >
+              <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+              </svg>
+              <span className="hidden sm:inline">Home</span>
+            </Link>
+
+            <span className="text-faint">/</span>
+
+            <Link
+              to="/dashboard"
+              title="Workspaces"
+              className="text-muted hover:text-fg font-medium px-2 py-1 rounded-md hover:bg-surface-2 transition"
+            >
+              Workspaces
+            </Link>
+
+            <span className="text-faint">/</span>
+          </div>
+
           <h1 className="font-bold text-fg truncate text-xs sm:text-sm">{room.title}</h1>
           <LanguageBadge language={room.language} />
         </div>
