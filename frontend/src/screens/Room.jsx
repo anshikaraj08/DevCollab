@@ -74,6 +74,17 @@ export default function Room() {
   const [snapshots, setSnapshots] = useState([]);
   const [snapshotOpen, setSnapshotOpen] = useState(false);
 
+  // Helper to reliably get latest code from collab, editor, or room
+  const getCode = useCallback(() => {
+    if (collab?.ytext && collab.ytext.length > 0) {
+      return collab.ytext.toString();
+    }
+    if (editorRef.current) {
+      return editorRef.current.getValue();
+    }
+    return room?.code || "";
+  }, [collab, room]);
+
   // Load room metadata on mount
   useEffect(() => {
     api
@@ -86,7 +97,7 @@ export default function Room() {
   useEffect(() => {
     if (!roomId) return;
     api.get(`/comments/${roomId}`)
-      .then((res) => setComments(res.data.comments))
+      .then((res) => setComments(res.data.comments || []))
       .catch(() => {});
   }, [roomId]);
 
@@ -94,7 +105,7 @@ export default function Room() {
   const loadSnapshots = useCallback(() => {
     if (!roomId) return;
     api.get(`/snapshots/${roomId}`)
-      .then((res) => setSnapshots(res.data.snapshots))
+      .then((res) => setSnapshots(res.data.snapshots || []))
       .catch(() => {});
   }, [roomId]);
 
@@ -128,10 +139,10 @@ export default function Room() {
 
   // Handle Save
   const handleSave = async () => {
-    if (!collab || !room) return;
+    if (!room) return;
     setSaving(true);
     try {
-      const code = collab.ytext.toString();
+      const code = getCode();
       await api.put(`/rooms/${roomId}/code`, { code });
       setSavedFeedback(true);
       setTimeout(() => setSavedFeedback(false), 2000);
@@ -153,20 +164,30 @@ export default function Room() {
     }
   }, [isDark]);
 
+  // Attach Collab whenever collab is ready and editor is mounted
+  useEffect(() => {
+    if (collab && editorRef.current && monacoRef.current) {
+      collab.attachEditor(editorRef.current, monacoRef.current);
+    }
+  }, [collab]);
+
   // Before mount: define custom theme
   const handleBeforeMount = (monaco) => {
     monacoRef.current = monaco;
     defineTheme(monaco);
   };
 
-  // On mount: wire Monaco to Yjs collab & keybindings
+  // On mount: store references and keybindings
   const onMount = useCallback(
     (editor, monaco) => {
       editorRef.current = editor;
       monacoRef.current = monaco;
       defineTheme(monaco);
       monaco.editor.setTheme(isDark ? "devcollab" : "vs");
-      if (collab) collab.attachEditor(editor, monaco);
+
+      if (collab) {
+        collab.attachEditor(editor, monaco);
+      }
 
       // Bind Ctrl+S / Cmd+S
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
@@ -178,11 +199,11 @@ export default function Room() {
 
   // Run code
   const run = async () => {
-    if (!room || !collab) return;
+    if (!room) return;
     setRunning(true);
     setPanelOpen(true);
     setOutput(null);
-    const code = collab.ytext.toString();
+    const code = getCode();
     try {
       const { data } = await api.post("/run", { language: room.language, code, stdin });
       setOutput(data);
@@ -219,8 +240,7 @@ export default function Room() {
 
   // Snapshot handlers
   const handleSaveSnapshot = async (name) => {
-    if (!collab) return;
-    const code = collab.ytext.toString();
+    const code = getCode();
     try {
       await api.post(`/snapshots/${roomId}`, { name, code });
       loadSnapshots();
@@ -237,13 +257,15 @@ export default function Room() {
     return data.snapshot;
   };
   const handleLoadSnapshot = (code) => {
-    if (!collab || !code) return;
-    const doc = collab.doc;
-    const ytext = collab.ytext;
-    doc.transact(() => {
-      ytext.delete(0, ytext.length);
-      ytext.insert(0, code);
-    });
+    if (!code) return;
+    if (collab?.doc && collab?.ytext) {
+      collab.doc.transact(() => {
+        collab.ytext.delete(0, collab.ytext.length);
+        collab.ytext.insert(0, code);
+      });
+    } else if (editorRef.current) {
+      editorRef.current.setValue(code);
+    }
   };
 
   // ── Error / loading states ────────────────────────────────────────────────
@@ -308,7 +330,7 @@ export default function Room() {
         </div>
 
         {/* Right: presence + status + actions */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           {/* Presence avatars */}
           {presence.length > 0 && <PresenceBar people={presence} />}
 
@@ -343,15 +365,15 @@ export default function Room() {
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v10H4V5zm2 2v2h8V7H6zm0 4v2h5v-2H6z" />
             </svg>
-            <span className="hidden sm:inline">Snapshots</span>
+            <span className="hidden md:inline">Snapshots</span>
           </button>
 
           {/* Save button */}
           <button
             onClick={handleSave}
-            disabled={saving || !collab}
+            disabled={saving}
             title="Save code (Ctrl+S)"
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold bg-surface-2 border border-line text-fg hover:border-fg/40 active:scale-95 transition disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold bg-surface-2 border border-line text-fg hover:border-fg/40 active:scale-95 transition disabled:opacity-50"
           >
             {savedFeedback ? (
               <>
@@ -376,8 +398,8 @@ export default function Room() {
           {/* Run button */}
           <button
             onClick={run}
-            disabled={running || !collab}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-fg hover:opacity-90 active:scale-95 transition disabled:opacity-50 group shadow-xs`}
+            disabled={running}
+            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-fg hover:opacity-90 active:scale-95 transition disabled:opacity-50 group shadow-xs"
           >
             {running ? (
               <>
@@ -425,6 +447,7 @@ export default function Room() {
               theme={isDark ? "devcollab" : "vs"}
               beforeMount={handleBeforeMount}
               onMount={onMount}
+              defaultValue={room?.code || ""}
               language={room.language}
               options={{
                 fontSize: 14,
@@ -524,10 +547,10 @@ export default function Room() {
       </div>
 
       {/* ── Snapshot Modal ───────────────────────────────────────────────────── */}
-      {snapshotOpen && collab && (
+      {snapshotOpen && (
         <SnapshotModal
           snapshots={snapshots}
-          currentCode={collab.ytext.toString()}
+          currentCode={getCode()}
           language={room.language}
           isDark={isDark}
           onSave={handleSaveSnapshot}

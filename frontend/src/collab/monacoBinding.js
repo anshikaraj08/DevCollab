@@ -1,5 +1,5 @@
 import * as Y from "yjs";
- 
+
 /**
  * Keeps a Monaco editor and a Yjs text (Y.Text) identical, and draws other people's cursors.
  * It uses the `monaco` object that @monaco-editor/react gives you in onMount, so no extra
@@ -13,17 +13,25 @@ export class MonacoBinding {
     this.awareness = awareness;
     this.model = editor.getModel();
     this.applyingRemote = false;
- 
+
     // Everyone must use the same line ending, otherwise character positions would differ.
     this.model.setEOL(monaco.editor.EndOfLineSequence.LF);
- 
+
     this.remoteDecorations = editor.createDecorationsCollection();
- 
-    // 1) start with the shared text
-    this.applyingRemote = true;
-    this.model.setValue(ytext.toString());
-    this.applyingRemote = false;
- 
+
+    // 1) Start with the shared text, or seed from editor if editor has room code
+    const editorVal = this.model.getValue();
+    const ytextVal = ytext.toString();
+    if (ytextVal.length > 0) {
+      this.applyingRemote = true;
+      this.model.setValue(ytextVal);
+      this.applyingRemote = false;
+    } else if (editorVal.length > 0) {
+      this.ytext.doc.transact(() => {
+        ytext.insert(0, editorVal);
+      }, this);
+    }
+
     // 2) editor -> Yjs
     this.modelListener = this.model.onDidChangeContent((event) => this.onEditorChange(event));
     // 3) Yjs -> editor
@@ -36,7 +44,7 @@ export class MonacoBinding {
     this.publishSelection();
     this.renderRemoteCursors();
   }
- 
+
   onEditorChange(event) {
     if (this.applyingRemote) return;                      // this change came from Yjs, do not echo it
     this.ytext.doc.transact(() => {
@@ -49,7 +57,7 @@ export class MonacoBinding {
       }
     }, this);                                             // origin = this binding
   }
- 
+
   onSharedChange(event, transaction) {
     if (transaction.origin === this) return;              // our own typing, already in the editor
     const edits = [];
@@ -81,7 +89,7 @@ export class MonacoBinding {
     }
     this.renderRemoteCursors();
   }
- 
+
   publishSelection() {
     const selection = this.editor.getSelection();
     if (!selection) return;
@@ -89,11 +97,11 @@ export class MonacoBinding {
       Y.relativePositionToJSON(
         Y.createRelativePositionFromTypeIndex(this.ytext, this.model.getOffsetAt({ lineNumber, column })));
     this.awareness.setLocalStateField("cursor", {
-      anchor: relative(selection.selectionStartLineNumber, selection.selectionStartColumn),
+      anchor: relative(selection.selectionStartColumn ? selection.selectionStartLineNumber : selection.positionLineNumber, selection.selectionStartColumn || selection.positionColumn),
       head: relative(selection.positionLineNumber, selection.positionColumn),
     });
   }
- 
+
   indexOf(relativeJson) {
     try {
       const relative = Y.createRelativePositionFromJSON(relativeJson);
@@ -103,7 +111,7 @@ export class MonacoBinding {
       return null;
     }
   }
- 
+
   renderRemoteCursors() {
     const stickiness = this.monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges;
     const decorations = [];
@@ -129,14 +137,13 @@ export class MonacoBinding {
     });
     this.remoteDecorations.set(decorations);
   }
- 
+
   destroy() {
     this.ytext.unobserve(this.yObserver);
-    this.modelListener.dispose();
-    this.cursorListener.dispose();
+    this.modelListener?.dispose();
+    this.cursorListener?.dispose();
     this.awareness.off("change", this.awarenessListener);
     this.awareness.setLocalStateField("cursor", null);
-    this.remoteDecorations.clear();
+    this.remoteDecorations?.clear();
   }
 }
-
