@@ -10,19 +10,19 @@ export default function AuthLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-fg transition-colors">
-      {/* ── Persistent Contrasting Dark Command Header Bar ── */}
-      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#1e293b] bg-[#0f172a] text-white shadow-md transition-colors">
+      {/* ── Persistent Header with Soft Cool Slate Background ── */}
+      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#cbd5e1] dark:border-[#27303f] bg-[#e6ebf2] dark:bg-[#161a22] shadow-xs transition-colors">
         <div className="flex h-full w-full items-center justify-between px-6 sm:px-10">
           <div className="flex items-center gap-3 shrink-0">
             <Link to="/" aria-label="DevCollab Home" className="flex items-center group shrink-0 mr-1">
-              <Logo size="md" inverted={true} />
+              <Logo size="md" />
             </Link>
 
-            <span className="h-5 w-px bg-white/20 shrink-0" />
+            <span className="h-5 w-px bg-slate-300 dark:bg-slate-700 shrink-0" />
 
             <Link
               to="/"
-              className="flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border border-white/10 transition cursor-pointer select-none shrink-0"
+              className="flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-300/80 dark:bg-[#202633] dark:hover:bg-[#272e3d] dark:text-slate-200 dark:border-[#333d4e] transition cursor-pointer select-none shrink-0 shadow-2xs"
             >
               <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />

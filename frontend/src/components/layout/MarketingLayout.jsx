@@ -24,27 +24,27 @@ export default function MarketingLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-fg transition-colors">
-      {/* ── Persistent Contrasting Dark Command Header Bar ── */}
-      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#1e293b] bg-[#0f172a] text-white shadow-md transition-colors">
+      {/* ── Persistent Header with Soft Cool Slate Background ── */}
+      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#cbd5e1] dark:border-[#27303f] bg-[#e6ebf2] dark:bg-[#161a22] shadow-xs transition-colors">
         <div className="flex h-full w-full items-center justify-between px-6 sm:px-10 gap-4">
 
           {/* Left: Brand Logo + Persistent Nav Buttons (same exact spot on all pages) */}
           <div className="flex items-center gap-3 shrink-0">
             <Link to={user ? "/dashboard" : "/"} aria-label="DevCollab" className="flex items-center group shrink-0 mr-1">
-              <Logo size="md" inverted={true} />
+              <Logo size="md" />
             </Link>
 
-            <span className="h-5 w-px bg-white/20 shrink-0" />
+            <span className="h-5 w-px bg-slate-300 dark:bg-slate-700 shrink-0" />
 
             {/* Home Pill */}
             <Link
               to="/"
               title="Home"
               className={cn(
-                "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border",
+                "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border shadow-2xs",
                 isHome
-                  ? "bg-white text-slate-900 border-white shadow-sm font-bold"
-                  : "bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border-white/10"
+                  ? "bg-[#0f172a] text-white border-[#0f172a] dark:bg-white dark:text-slate-900 dark:border-white shadow-xs font-bold"
+                  : "bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border-slate-300/80 dark:bg-[#202633] dark:hover:bg-[#272e3d] dark:text-slate-200 dark:border-[#333d4e]"
               )}
             >
               <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -59,10 +59,10 @@ export default function MarketingLayout() {
                 to="/dashboard"
                 title="Workspaces Dashboard"
                 className={cn(
-                  "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border",
+                  "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border shadow-2xs",
                   isDashboard
-                    ? "bg-white text-slate-900 border-white shadow-sm font-bold"
-                    : "bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border-white/10"
+                    ? "bg-[#0f172a] text-white border-[#0f172a] dark:bg-white dark:text-slate-900 dark:border-white shadow-xs font-bold"
+                    : "bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border-slate-300/80 dark:bg-[#202633] dark:hover:bg-[#272e3d] dark:text-slate-200 dark:border-[#333d4e]"
                 )}
               >
                 <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -79,7 +79,7 @@ export default function MarketingLayout() {
               <a
                 key={link.href}
                 href={link.href}
-                className="text-xs font-semibold text-slate-300 hover:text-white transition select-none"
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition select-none"
               >
                 {link.label}
               </a>
@@ -93,12 +93,12 @@ export default function MarketingLayout() {
                 <>
                   <div className="flex items-center gap-2.5">
                     <Avatar name={user.name} size="sm" />
-                    <span className="text-sm font-semibold text-white hidden md:inline">{user.name}</span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 hidden md:inline">{user.name}</span>
                   </div>
                   <button
                     type="button"
                     onClick={logout}
-                    className="text-xs font-semibold text-slate-300 hover:text-white transition cursor-pointer"
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition cursor-pointer"
                   >
                     Log out
                   </button>
@@ -107,13 +107,13 @@ export default function MarketingLayout() {
                 <div className="flex items-center gap-2">
                   <Link
                     to="/login"
-                    className="h-9 px-4 rounded-full text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
+                    className="h-9 px-4 rounded-full text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-white/80 transition flex items-center justify-center cursor-pointer"
                   >
                     Log in
                   </Link>
                   <Link
                     to="/register"
-                    className="h-9 px-4 rounded-full text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-sm transition flex items-center justify-center cursor-pointer"
+                    className="h-9 px-4 rounded-full text-xs font-bold bg-[#0f172a] text-white hover:bg-black dark:bg-white dark:text-slate-950 shadow-xs transition flex items-center justify-center cursor-pointer"
                   >
                     Get started
                   </Link>
