@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import PageContainer from "../components/layout/PageContainer";
 import HowItWorks from "../components/landing/HowItWorks";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import api from "../config/axios";
+import { UserContext } from "../context/user.context";
 
 const CODE_SAMPLES = {
   cpp: {
@@ -98,6 +99,7 @@ const FEATURES = [
 ];
 
 export default function Landing() {
+  const { user } = useContext(UserContext);
   const [selectedLang, setSelectedLang] = useState("cpp");
   const [terminalOutput, setTerminalOutput] = useState(CODE_SAMPLES.cpp.expectedOutput);
   const [isRunning, setIsRunning] = useState(false);
@@ -182,7 +184,7 @@ export default function Landing() {
         <PageContainer className="relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-line bg-surface/90 backdrop-blur-sm text-[11px] font-mono tracking-wider uppercase text-muted mb-6 shadow-xs">
             <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>REAL-TIME COLLABORATIVE CODE WORKSPACE</span>
+            <span>{user ? `Logged in as ${user.name}` : "REAL-TIME COLLABORATIVE CODE WORKSPACE"}</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-[1.12] mb-6 text-fg">
@@ -195,12 +197,20 @@ export default function Landing() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-3.5 mb-4">
-            <Button to="/register" size="lg" className="shadow-md">
-              Get Started Free &rarr;
-            </Button>
-            <Button to="/login" variant="secondary" size="lg">
-              Sign In
-            </Button>
+            {user ? (
+              <Button to="/dashboard" size="lg" className="shadow-md">
+                Open Workspaces &rarr;
+              </Button>
+            ) : (
+              <>
+                <Button to="/register" size="lg" className="shadow-md">
+                  Get Started Free &rarr;
+                </Button>
+                <Button to="/login" variant="secondary" size="lg">
+                  Sign In
+                </Button>
+              </>
+            )}
           </div>
         </PageContainer>
 
