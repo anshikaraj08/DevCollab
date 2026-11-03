@@ -11,3 +11,4 @@ const snapshotSchema = new mongoose.Schema(
 );
 
 export default mongoose.model("Snapshot", snapshotSchema);
+

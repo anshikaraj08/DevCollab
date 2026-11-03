@@ -12,7 +12,7 @@ const WANDBOX_COMPILERS = {
 };
 
 export const runCode = asyncHandler(async (req, res) => {
-  const { language, code } = req.body;
+  const { language, code, stdin } = req.body;
 
   if (!language || typeof code !== "string") {
     throw new ApiError(400, "language and code are required");
@@ -37,6 +37,7 @@ export const runCode = asyncHandler(async (req, res) => {
     body: JSON.stringify({
       compiler,
       code: cleanCode,
+      stdin: stdin || "",
     }),
   });
 
