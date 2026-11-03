@@ -18,8 +18,8 @@ export default function MarketingLayout() {
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-fg transition-colors">
       {/* ── Consistent Full-Width Header Bar ── */}
-      <header className="sticky top-0 z-30 h-16 w-full border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-xs transition-colors">
-        <div className="flex h-full w-full items-center justify-between px-5 sm:px-8 gap-4">
+      <header className="sticky top-0 z-30 h-[68px] w-full border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-sm transition-colors">
+        <div className="flex h-full w-full items-center justify-between px-6 sm:px-10 gap-4">
 
           {/* Left Corner: Brand Logo */}
           <div className="flex items-center gap-4">
