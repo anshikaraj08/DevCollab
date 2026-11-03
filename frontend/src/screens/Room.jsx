@@ -294,42 +294,52 @@ export default function Room() {
 
   return (
     <div className="flex flex-col h-screen bg-canvas transition-colors">
-      {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 flex items-center justify-between px-5 sm:px-8 h-16 shrink-0 border-b border-line bg-surface/95 backdrop-blur-md shadow-xs transition-colors">
-        {/* Left: Brand Logo in corner + Back button + Home/Dashboard navigation + title + badge */}
-        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
-          <Link to="/dashboard" title="DevCollab Workspaces" className="flex items-center hover:opacity-85 transition shrink-0 group">
+      {/* ── Consistent Full-Width Header Bar with Distinct Color ── */}
+      <header className="sticky top-0 z-30 flex items-center justify-between px-5 sm:px-8 h-16 shrink-0 border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-xs transition-colors">
+        {/* Left: Brand Logo in corner + Unified Navigation Buttons + Divider + Room info */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <Link to="/dashboard" title="DevCollab Workspaces" className="flex items-center hover:opacity-85 transition shrink-0 group mr-1 sm:mr-2">
             <Logo size="md" />
           </Link>
 
+          {/* Back Button */}
           <button
             type="button"
             onClick={() => navigate(-1)}
             title="Go back to previous page"
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-muted hover:text-fg border border-line bg-surface-2 hover:bg-surface transition cursor-pointer shrink-0"
+            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-semibold text-muted hover:text-fg border border-line bg-surface hover:bg-surface-2 transition cursor-pointer shrink-0"
           >
             <span>←</span>
-            <span className="hidden sm:inline">Back</span>
+            <span>Back</span>
           </button>
 
-          <div className="hidden lg:flex items-center gap-1 text-xs">
-            <Link
-              to="/"
-              className="px-2.5 py-1 rounded-full text-muted hover:text-fg hover:bg-surface-2 transition font-medium"
-            >
-              Home
-            </Link>
-            <span className="text-faint">/</span>
-            <Link
-              to="/dashboard"
-              className="px-2.5 py-1 rounded-full text-muted hover:text-fg hover:bg-surface-2 transition font-medium"
-            >
-              Dashboard
-            </Link>
-            <span className="text-faint">/</span>
-          </div>
+          {/* Home Button */}
+          <Link
+            to="/"
+            title="Home page"
+            className="hidden sm:flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-semibold bg-surface hover:bg-surface-2 text-muted hover:text-fg border border-line hover:border-fg/30 transition cursor-pointer shrink-0"
+          >
+            <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+            </svg>
+            <span>Home</span>
+          </Link>
 
-          <span className="text-faint lg:hidden">/</span>
+          {/* Dashboard Button */}
+          <Link
+            to="/dashboard"
+            title="Workspaces dashboard"
+            className="hidden sm:flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-semibold bg-surface hover:bg-surface-2 text-muted hover:text-fg border border-line hover:border-fg/30 transition cursor-pointer shrink-0"
+          >
+            <svg className="size-3.5 text-current opacity-80" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v10H4V5zm2 2v2h8V7H6zm0 4v2h5v-2H6z" />
+            </svg>
+            <span>Dashboard</span>
+          </Link>
+
+          {/* Divider & Room Meta */}
+          <span className="hidden md:inline-block h-5 w-px bg-line shrink-0 mx-1" />
+
           <h1 className="font-bold text-fg truncate text-xs sm:text-sm">{room.title}</h1>
           <LanguageBadge language={room.language} />
         </div>
@@ -349,10 +359,10 @@ export default function Room() {
           <button
             onClick={() => setCommentPanelOpen((o) => !o)}
             title="Code comments"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+            className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
               commentPanelOpen
                 ? "border-primary text-primary bg-primary/10"
-                : "border-line text-muted hover:text-fg hover:border-fg/30"
+                : "border-line text-muted hover:text-fg hover:border-fg/30 bg-surface hover:bg-surface-2"
             }`}
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -365,7 +375,7 @@ export default function Room() {
           <button
             onClick={() => setSnapshotOpen(true)}
             title="Version snapshots"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-line text-muted hover:text-fg hover:border-fg/30 transition"
+            className="flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-semibold border border-line text-muted hover:text-fg hover:border-fg/30 bg-surface hover:bg-surface-2 transition cursor-pointer"
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v10H4V5zm2 2v2h8V7H6zm0 4v2h5v-2H6z" />
@@ -378,7 +388,7 @@ export default function Room() {
             onClick={handleSave}
             disabled={saving}
             title="Save code (Ctrl+S)"
-            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold bg-surface-2 border border-line text-fg hover:border-fg/40 active:scale-95 transition disabled:opacity-50"
+            className="flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-semibold bg-surface border border-line text-fg hover:border-fg/40 hover:bg-surface-2 active:scale-95 transition cursor-pointer disabled:opacity-50"
           >
             {savedFeedback ? (
               <>
@@ -404,7 +414,7 @@ export default function Room() {
           <button
             onClick={run}
             disabled={running}
-            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-primary-fg hover:opacity-90 active:scale-95 transition disabled:opacity-50 group shadow-xs"
+            className="flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-bold bg-primary text-primary-fg hover:opacity-90 active:scale-95 transition disabled:opacity-50 cursor-pointer shadow-xs"
           >
             {running ? (
               <>
@@ -446,7 +456,7 @@ export default function Room() {
           </div>
 
           {/* Monaco Editor */}
-          <div className="flex-1 min-h-0 bg-canvas">
+          <div className="flex-1 min-h-0" style={{ background: isDark ? "#181818" : "#ffffff" }}>
             <Editor
               height="100%"
               theme={isDark ? "devcollab" : "vs"}
