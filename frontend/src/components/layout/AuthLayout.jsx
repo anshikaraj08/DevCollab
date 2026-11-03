@@ -10,19 +10,19 @@ export default function AuthLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-fg transition-colors">
-      {/* ── Persistent Header Bar ── */}
-      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-xs transition-colors">
+      {/* ── Persistent Contrasting Dark Command Header Bar ── */}
+      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#1e293b] bg-[#0f172a] text-white shadow-md transition-colors">
         <div className="flex h-full w-full items-center justify-between px-6 sm:px-10">
           <div className="flex items-center gap-3 shrink-0">
             <Link to="/" aria-label="DevCollab Home" className="flex items-center group shrink-0 mr-1">
-              <Logo size="md" />
+              <Logo size="md" inverted={true} />
             </Link>
 
-            <span className="h-5 w-px bg-line shrink-0" />
+            <span className="h-5 w-px bg-white/20 shrink-0" />
 
             <Link
               to="/"
-              className="flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold bg-surface text-muted hover:text-fg border border-line hover:border-fg/30 hover:bg-surface-2 transition cursor-pointer select-none shrink-0"
+              className="flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border border-white/10 transition cursor-pointer select-none shrink-0"
             >
               <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
@@ -154,22 +154,17 @@ export default function AuthLayout({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  {/* Cloud backdrop */}
                   <path
                     d="M50 110 C40 100 45 80 60 75 C65 55 90 50 105 60 C120 48 145 55 148 75 C165 80 168 100 155 115"
                     className="stroke-line"
                     strokeWidth="1.5"
                     strokeDasharray="4 4"
                   />
-
-                  {/* Floating heart */}
                   <path
                     d="M100 85 C95 78 85 80 85 88 C85 96 100 104 100 104 C100 104 115 96 115 88 C115 80 105 78 100 85 Z"
                     className="fill-emerald-500/20 stroke-emerald-500"
                     strokeWidth="1.5"
                   />
-
-                  {/* Meditating Figure */}
                   <circle cx="100" cy="50" r="14" className="stroke-fg" />
                   <path d="M88 48 Q100 40 112 48" className="stroke-fg" />
                   <path d="M100 64 L100 105" className="stroke-fg" />

@@ -3,7 +3,7 @@
  * Brand Mark: Two vibrant developer code chevrons (Emerald & Cyan)
  * converging at a central collaborative nexus spark.
  */
-export default function Logo({ size = "md", showText = true }) {
+export default function Logo({ size = "md", showText = true, inverted = false }) {
   const dims = {
     sm: { wrap: 30, text: "text-sm", gap: "gap-2" },
     md: { wrap: 36, text: "text-[15px] sm:text-base", gap: "gap-2.5" },
@@ -78,8 +78,8 @@ export default function Logo({ size = "md", showText = true }) {
       {/* ── Brand Typography: DevCollab ── */}
       {showText && (
         <span className={`${dims.text} font-bold tracking-tight leading-none flex items-baseline`}>
-          <span className="text-fg font-extrabold">Dev</span>
-          <span className="text-emerald-500 font-bold ml-[1.5px]">Collab</span>
+          <span className={`font-extrabold ${inverted ? "text-white" : "text-fg dark:text-white"}`}>Dev</span>
+          <span className="text-emerald-400 font-bold ml-[1.5px]">Collab</span>
         </span>
       )}
     </span>

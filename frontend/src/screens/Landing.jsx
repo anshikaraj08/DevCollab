@@ -134,28 +134,90 @@ export default function Landing() {
 
   return (
     <>
-      {/* ── Hero ── */}
-      <section className="py-20 text-center">
-        <PageContainer>
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-line bg-surface text-[11px] font-mono tracking-wider uppercase text-muted mb-6">
-            <span className="size-1.5 rounded-full bg-success animate-pulse" />
+      {/* ── Hero with Coder-style Illustrated Background ── */}
+      <section className="relative overflow-hidden pt-20 pb-28 text-center border-b border-line bg-canvas">
+        {/* Background Image Layer */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-40 dark:opacity-15 pointer-events-none transition-opacity"
+          style={{ backgroundImage: "url('/hero-bg.jpg')" }}
+        />
+
+        {/* Ambient Gradient Overlay & Developer Grid */}
+        <div className="absolute inset-0 bg-gradient-to-b from-canvas/40 via-transparent to-canvas pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] opacity-25 pointer-events-none" />
+
+        {/* Whimsical Floating Developer Stickers (Left & Right) */}
+        {/* Left Cloud & Peace Sign */}
+        <div className="hidden xl:block absolute top-16 left-10 pointer-events-none select-none animate-pulse duration-1000">
+          <svg className="w-32 h-20 text-muted/30 stroke-current" viewBox="0 0 120 70" fill="none" strokeWidth="1.6" strokeLinecap="round">
+            <path d="M25 50 C15 50 10 40 18 32 C15 20 30 12 42 20 C50 10 70 10 78 20 C90 12 105 20 102 32 C110 40 105 50 95 50 Z" />
+            <path d="M30 42 L38 34 M45 44 L53 36 M60 42 L68 34 M75 44 L83 36" strokeDasharray="2 3" opacity="0.6" />
+          </svg>
+        </div>
+
+        <div className="hidden lg:flex absolute top-48 left-16 pointer-events-none select-none items-center gap-2 px-3 py-1.5 rounded-2xl bg-surface border border-line shadow-lg transform -rotate-6">
+          <span className="text-base">✌️</span>
+          <span className="text-[11px] font-mono font-bold text-fg">multiplayer</span>
+        </div>
+
+        {/* Right Cloud & Terminal Sticker */}
+        <div className="hidden xl:block absolute top-12 right-12 pointer-events-none select-none animate-pulse duration-700">
+          <svg className="w-36 h-22 text-muted/30 stroke-current" viewBox="0 0 130 75" fill="none" strokeWidth="1.6" strokeLinecap="round">
+            <path d="M25 55 C15 55 10 44 20 35 C18 22 35 14 48 22 C56 12 78 12 86 22 C100 14 116 22 112 35 C122 44 116 55 105 55 Z" />
+            <path d="M35 46 L43 38 M50 48 L58 40 M65 46 L73 38 M80 48 L88 40" strokeDasharray="2 3" opacity="0.6" />
+          </svg>
+        </div>
+
+        <div className="hidden lg:flex absolute top-44 right-20 pointer-events-none select-none flex-col rounded-xl bg-[#090d16] border border-[#1e293b] p-3 shadow-2xl w-36 text-left font-mono transform rotate-3">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="size-2 rounded-full bg-[#ff5f56]" />
+            <span className="size-2 rounded-full bg-[#ffbd2e]" />
+            <span className="size-2 rounded-full bg-[#27c93f]" />
+          </div>
+          <span className="text-xs text-emerald-400 font-bold">$ devcollab</span>
+          <span className="text-[10px] text-slate-400">syncing rooms...</span>
+        </div>
+
+        {/* Main Hero Content */}
+        <PageContainer className="relative z-10">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-line bg-surface/90 backdrop-blur-sm text-[11px] font-mono tracking-wider uppercase text-muted mb-6 shadow-xs">
+            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>REAL-TIME COLLABORATIVE CODE WORKSPACE</span>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-[1.15] mb-5">
-            Write, compile, and review <br className="hidden sm:block" />
-            code in shared rooms
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-[1.12] mb-6 text-fg">
+            The developer workspace <br className="hidden sm:block" />
+            platform for shared code
           </h1>
 
-          <p className="text-sm text-muted max-w-xl mx-auto leading-relaxed mb-8">
-            DevCollab provides fast, distraction-free workspaces with instant execution for C++, JavaScript, Python, and Java.
+          <p className="text-sm sm:text-base text-muted max-w-2xl mx-auto leading-relaxed mb-8">
+            DevCollab moves developer workspaces to the browser. Write, compile, execute, and review code together in real-time with zero configuration.
           </p>
 
-          <div className="flex justify-center gap-3">
-            <Button to="/register" size="lg">Get Started Free &rarr;</Button>
-            <Button to="/login" variant="secondary" size="lg">Sign In</Button>
+          <div className="flex flex-wrap justify-center gap-3.5 mb-4">
+            <Button to="/register" size="lg" className="shadow-md">
+              Get Started Free &rarr;
+            </Button>
+            <Button to="/login" variant="secondary" size="lg">
+              Sign In
+            </Button>
           </div>
         </PageContainer>
+
+        {/* Delicate Grassy Meadow Horizon Line at bottom */}
+        <div className="absolute bottom-0 inset-x-0 pointer-events-none flex justify-center text-muted/40">
+          <svg className="w-full h-8 text-current stroke-current" preserveAspectRatio="none" viewBox="0 0 1200 30" fill="none">
+            <path d="M0 25 Q300 15 600 25 T1200 25" strokeWidth="1.5" />
+            {/* Flower doodles along the line */}
+            <circle cx="150" cy="20" r="2.5" fill="currentColor" opacity="0.7" />
+            <path d="M150 20 L150 25 M148 22 L152 22" strokeWidth="1" />
+            <circle cx="380" cy="18" r="3" fill="currentColor" opacity="0.7" />
+            <path d="M380 18 L380 25" strokeWidth="1" />
+            <circle cx="720" cy="22" r="2.5" fill="currentColor" opacity="0.7" />
+            <circle cx="950" cy="20" r="3" fill="currentColor" opacity="0.7" />
+            <path d="M950 20 L950 25" strokeWidth="1" />
+          </svg>
+        </div>
       </section>
 
       {/* ── Platform: Supported environments & runtimes ── */}

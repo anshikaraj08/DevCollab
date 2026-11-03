@@ -24,17 +24,17 @@ export default function MarketingLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-fg transition-colors">
-      {/* ── Persistent Header Bar ── */}
-      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-xs transition-colors">
+      {/* ── Persistent Contrasting Dark Command Header Bar ── */}
+      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#1e293b] bg-[#0f172a] text-white shadow-md transition-colors">
         <div className="flex h-full w-full items-center justify-between px-6 sm:px-10 gap-4">
 
           {/* Left: Brand Logo + Persistent Nav Buttons (same exact spot on all pages) */}
           <div className="flex items-center gap-3 shrink-0">
             <Link to={user ? "/dashboard" : "/"} aria-label="DevCollab" className="flex items-center group shrink-0 mr-1">
-              <Logo size="md" />
+              <Logo size="md" inverted={true} />
             </Link>
 
-            <span className="h-5 w-px bg-line shrink-0" />
+            <span className="h-5 w-px bg-white/20 shrink-0" />
 
             {/* Home Pill */}
             <Link
@@ -43,8 +43,8 @@ export default function MarketingLayout() {
               className={cn(
                 "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border",
                 isHome
-                  ? "bg-fg text-canvas border-fg shadow-xs"
-                  : "bg-surface text-muted hover:text-fg border-line hover:border-fg/30 hover:bg-surface-2"
+                  ? "bg-white text-slate-900 border-white shadow-sm font-bold"
+                  : "bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border-white/10"
               )}
             >
               <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -61,8 +61,8 @@ export default function MarketingLayout() {
                 className={cn(
                   "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border",
                   isDashboard
-                    ? "bg-fg text-canvas border-fg shadow-xs"
-                    : "bg-surface text-muted hover:text-fg border-line hover:border-fg/30 hover:bg-surface-2"
+                    ? "bg-white text-slate-900 border-white shadow-sm font-bold"
+                    : "bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border-white/10"
                 )}
               >
                 <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -79,7 +79,7 @@ export default function MarketingLayout() {
               <a
                 key={link.href}
                 href={link.href}
-                className="text-xs font-semibold text-muted hover:text-fg transition select-none"
+                className="text-xs font-semibold text-slate-300 hover:text-white transition select-none"
               >
                 {link.label}
               </a>
@@ -93,12 +93,12 @@ export default function MarketingLayout() {
                 <>
                   <div className="flex items-center gap-2.5">
                     <Avatar name={user.name} size="sm" />
-                    <span className="text-sm font-semibold text-fg hidden md:inline">{user.name}</span>
+                    <span className="text-sm font-semibold text-white hidden md:inline">{user.name}</span>
                   </div>
                   <button
                     type="button"
                     onClick={logout}
-                    className="text-xs font-semibold text-muted hover:text-fg transition cursor-pointer"
+                    className="text-xs font-semibold text-slate-300 hover:text-white transition cursor-pointer"
                   >
                     Log out
                   </button>
@@ -107,13 +107,13 @@ export default function MarketingLayout() {
                 <div className="flex items-center gap-2">
                   <Link
                     to="/login"
-                    className="h-9 px-4 rounded-full text-xs font-semibold text-muted hover:text-fg hover:bg-surface-2 transition flex items-center justify-center cursor-pointer"
+                    className="h-9 px-4 rounded-full text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
                   >
                     Log in
                   </Link>
                   <Link
                     to="/register"
-                    className="h-9 px-4 rounded-full text-xs font-bold bg-primary text-primary-fg hover:opacity-90 shadow-xs transition flex items-center justify-center cursor-pointer"
+                    className="h-9 px-4 rounded-full text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-sm transition flex items-center justify-center cursor-pointer"
                   >
                     Get started
                   </Link>
@@ -130,7 +130,7 @@ export default function MarketingLayout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-line">
+      <footer className="border-t border-line bg-surface/50">
         <PageContainer className="flex h-16 items-center justify-between text-xs text-faint">
           <span className="font-mono">&copy; {new Date().getFullYear()} DevCollab</span>
           <span className="hidden font-mono sm:inline">Collaborative Code Review Platform</span>

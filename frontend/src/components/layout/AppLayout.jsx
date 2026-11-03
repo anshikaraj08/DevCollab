@@ -17,17 +17,17 @@ export default function AppLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-fg transition-colors">
-      {/* ── Persistent Header Bar ── */}
-      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#e2e5e9] dark:border-[#27272a] bg-[#f0f2f5] dark:bg-[#161616] shadow-xs transition-colors">
+      {/* ── Persistent Contrasting Dark Command Header Bar ── */}
+      <header className="sticky top-0 z-30 h-[76px] w-full border-b border-[#1e293b] bg-[#0f172a] text-white shadow-md transition-colors">
         <div className="flex h-full w-full items-center justify-between px-6 sm:px-10 gap-4">
 
           {/* Left: Brand Logo + Persistent Nav Buttons (same exact spot on all pages) */}
           <div className="flex items-center gap-3 shrink-0">
             <Link to="/dashboard" aria-label="DevCollab" className="flex items-center group shrink-0 mr-1">
-              <Logo size="md" />
+              <Logo size="md" inverted={true} />
             </Link>
 
-            <span className="h-5 w-px bg-line shrink-0" />
+            <span className="h-5 w-px bg-white/20 shrink-0" />
 
             {/* Home Pill */}
             <Link
@@ -36,8 +36,8 @@ export default function AppLayout() {
               className={cn(
                 "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border",
                 isHome
-                  ? "bg-fg text-canvas border-fg shadow-xs"
-                  : "bg-surface text-muted hover:text-fg border-line hover:border-fg/30 hover:bg-surface-2"
+                  ? "bg-white text-slate-900 border-white shadow-sm font-bold"
+                  : "bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border-white/10"
               )}
             >
               <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -53,8 +53,8 @@ export default function AppLayout() {
               className={cn(
                 "flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold select-none transition shrink-0 cursor-pointer border",
                 isDashboard
-                  ? "bg-fg text-canvas border-fg shadow-xs"
-                  : "bg-surface text-muted hover:text-fg border-line hover:border-fg/30 hover:bg-surface-2"
+                  ? "bg-white text-slate-900 border-white shadow-sm font-bold"
+                  : "bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border-white/10"
               )}
             >
               <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -69,13 +69,13 @@ export default function AppLayout() {
             {user && (
               <div className="flex items-center gap-2.5">
                 <Avatar name={user.name} size="sm" />
-                <span className="text-sm font-semibold text-fg hidden md:inline">{user.name}</span>
+                <span className="text-sm font-semibold text-white hidden md:inline">{user.name}</span>
               </div>
             )}
             <button
               type="button"
               onClick={logout}
-              className="text-xs font-semibold text-muted hover:text-fg transition cursor-pointer"
+              className="text-xs font-semibold text-slate-300 hover:text-white transition cursor-pointer"
             >
               Log out
             </button>
