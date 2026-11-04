@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, phase-3]
+  pull_request:
+    branches: [main, master, phase-3]
+
+jobs:
+  test-and-build:
+    name: Test and Build
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+
+    env:
+      NODE_ENV: test
+      PORT: 5000
+      MONGO_URI: mongodb://127.0.0.1:27017/devcollab_test
+      JWT_ACCESS_SECRET: test-secret-at-least-32-characters-long-key
+      JWT_REFRESH_SECRET: test-refresh-secret-at-least-32-characters-long
+      CLIENT_URL: http://localhost:5173
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package.json
+            frontend/package.json
+
+      - name: Install backend dependencies
+        run: npm --prefix backend install
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend install
+
+      - name: Run backend tests
+        run: npm --prefix backend test
+        env:
+          MONGO_URI_TEST: mongodb://127.0.0.1:27017/devcollab_test
+
+      - name: Run frontend tests
+        run: npm --prefix frontend test
+
+      - name: Build frontend
+        run: npm --prefix frontend run build

@@ -20,6 +20,7 @@ export function createSocketServer(httpServer, deps) {
     maxHttpBufferSize: 1e6,
   });
   const awarenessByRoom = new Map(); // roomId -> Map(socketId -> { clientId, update })
+  const socketsByUserId = new Map(); // userId -> Set(socketId)
 
   store.onSaved = (roomId, at) => io.to(roomKey(roomId)).emit("room:saved", { roomId, at });
   store.onServerUpdate = (roomId, update) => io.to(roomKey(roomId)).emit("yjs:update", { roomId, update });
@@ -32,7 +33,16 @@ export function createSocketServer(httpServer, deps) {
       const payload = verifyToken(token);
       const user = await getUser(payload.id);
       if (!user) return next(new Error("AUTH"));
-      socket.data.user = { id: String(user.id), name: user.name };
+      const userId = String(user.id);
+
+      // Max 10 concurrent sockets per user
+      const existing = socketsByUserId.get(userId);
+      if (existing && existing.size >= 10) {
+        logger.warn({ userId }, "Max concurrent sockets reached (10), connection rejected");
+        return next(new Error("TOO_MANY"));
+      }
+
+      socket.data.user = { id: userId, name: user.name };
       next();
     } catch {
       next(new Error("AUTH"));
@@ -40,6 +50,11 @@ export function createSocketServer(httpServer, deps) {
   });
 
   io.on("connection", (socket) => {
+    const userId = socket.data.user.id;
+    let userSockets = socketsByUserId.get(userId);
+    if (!userSockets) socketsByUserId.set(userId, (userSockets = new Set()));
+    userSockets.add(socket.id);
+
     socket.data.rooms = new Set();
     socket.data.roles = {};
     socket.data.queue = Promise.resolve();
@@ -76,6 +91,7 @@ export function createSocketServer(httpServer, deps) {
       }
       await socket.leave(roomKey(roomId));
       await store.release(roomId);
+      logger.info({ userId: socket.data.user.id, roomId }, "Socket left room");
     };
 
     // 2) Join a room: only members are allowed. The reply carries the whole document and role.
@@ -98,6 +114,7 @@ export function createSocketServer(httpServer, deps) {
           await socket.join(roomKey(roomId));
         }
         const awareness = [...(awarenessByRoom.get(roomId)?.values() ?? [])].map((s) => s.update);
+        logger.info({ userId: socket.data.user.id, roomId, role: room.role }, "Socket joined room");
         reply({ ok: true, state: Y.encodeStateAsUpdate(entry.doc), awareness, room, user: socket.data.user });
       }).catch((err) => {
         logger.error({ err }, "room:join failed");
@@ -112,7 +129,10 @@ export function createSocketServer(httpServer, deps) {
 
     // 3) Document changes: viewers rejected with READ_ONLY
     socket.on("yjs:update", (payload) => {
-      if (!allowed()) return socket.emit("room:error", { error: "RATE_LIMIT" });
+      if (!allowed()) {
+        logger.warn({ userId: socket.data.user.id }, "Socket event rate limit hit on yjs:update");
+        return socket.emit("room:error", { error: "RATE_LIMIT" });
+      }
       const roomId = String(payload?.roomId ?? "");
       if (socket.data.roles[roomId] === "viewer") {
         return socket.emit("room:error", { roomId, error: "READ_ONLY" });
@@ -131,7 +151,10 @@ export function createSocketServer(httpServer, deps) {
 
     // 4) Cursor and presence
     socket.on("awareness:update", (payload) => {
-      if (!allowed()) return;
+      if (!allowed()) {
+        logger.warn({ userId: socket.data.user.id }, "Socket event rate limit hit on awareness:update");
+        return;
+      }
       const roomId = String(payload?.roomId ?? "");
       const update = toBytes(payload?.update);
       const clientId = Number(payload?.clientId);
@@ -143,6 +166,12 @@ export function createSocketServer(httpServer, deps) {
     });
 
     socket.on("disconnect", () => {
+      const uSockets = socketsByUserId.get(userId);
+      if (uSockets) {
+        uSockets.delete(socket.id);
+        if (uSockets.size === 0) socketsByUserId.delete(userId);
+      }
+
       serial(async () => {
         for (const roomId of [...socket.data.rooms]) await leaveRoom(roomId);
       }).catch((err) => logger.error({ err }, "cleanup after disconnect failed"));
@@ -156,6 +185,7 @@ export function createSocketServer(httpServer, deps) {
       for (const s of socketsInRoom) {
         const room = await getRoomForMember(roomId, s.data.user.id);
         if (!room) {
+          logger.info({ userId: s.data.user.id, roomId }, "Socket removed from room via sync");
           s.emit("room:removed", { roomId });
           const map = awarenessByRoom.get(roomId);
           const info = map?.get(s.id);
@@ -171,6 +201,10 @@ export function createSocketServer(httpServer, deps) {
         } else {
           s.data.roles = s.data.roles || {};
           if (s.data.roles[roomId] !== room.role) {
+            logger.info(
+              { userId: s.data.user.id, roomId, oldRole: s.data.roles[roomId], newRole: room.role },
+              "Socket role updated via sync"
+            );
             s.data.roles[roomId] = room.role;
             s.emit("room:role", { roomId, role: room.role });
           }

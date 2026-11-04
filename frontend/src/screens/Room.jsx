@@ -481,7 +481,9 @@ export default function Room() {
 
           {/* Share / People Modal Button */}
           <button
+            type="button"
             onClick={() => setShareOpen(true)}
+            aria-label={isOwner ? "Share room" : "View workspace members"}
             title={isOwner ? "Share and invite collaborators" : "View workspace members"}
             className="flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border border-white/10 text-slate-300 hover:text-white bg-white/[0.08] hover:bg-white/[0.14] transition cursor-pointer select-none"
           >
@@ -504,6 +506,7 @@ export default function Room() {
 
           {/* Comments */}
           <button
+            type="button"
             onClick={() => {
               if (sidePanelOpen && activeSideTab === "comments") {
                 setSidePanelOpen(false);
@@ -512,6 +515,7 @@ export default function Room() {
                 setActiveSideTab("comments");
               }
             }}
+            aria-label="Code comments"
             title="Code comments"
             className={`flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
               sidePanelOpen && activeSideTab === "comments"
@@ -528,6 +532,7 @@ export default function Room() {
 
           {/* Snapshots / History */}
           <button
+            type="button"
             onClick={() => {
               if (sidePanelOpen && activeSideTab === "history") {
                 setSidePanelOpen(false);
@@ -536,6 +541,7 @@ export default function Room() {
                 setActiveSideTab("history");
               }
             }}
+            aria-label="Version history"
             title="Version history"
             className={`flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
               sidePanelOpen && activeSideTab === "history"
@@ -587,8 +593,10 @@ export default function Room() {
           {/* Save (only for editors and owner) */}
           {!isViewer && (
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
+              aria-label="Save code"
               title="Save (Ctrl+S)"
               className="flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold bg-white/[0.08] hover:bg-white/[0.14] border border-white/10 text-white active:scale-95 transition cursor-pointer select-none disabled:opacity-50"
             >
@@ -617,6 +625,7 @@ export default function Room() {
           <button
             type="button"
             onClick={() => setPanelOpen((v) => !v)}
+            aria-label="Toggle console and tests"
             title="Toggle Console & Tests"
             className={`flex items-center gap-1.5 h-9 px-3 sm:px-3.5 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
               panelOpen
@@ -633,8 +642,11 @@ export default function Room() {
 
           {/* Run */}
           <button
+            type="button"
             onClick={() => run()}
             disabled={running}
+            aria-label="Run code"
+            title="Run code"
             className="flex items-center gap-1.5 h-9 px-4 sm:px-5 rounded-full text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 active:scale-95 transition disabled:opacity-50 cursor-pointer shadow-sm select-none"
           >
             {running ? (
