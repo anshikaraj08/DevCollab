@@ -118,7 +118,7 @@ function CommentThread({ comment, onResolve, onReply, onDelete }) {
  *   onDelete(id): void
  *   onClose(): void
  */
-export default function CommentPanel({ comments, onAdd, onResolve, onReply, onDelete, onClose }) {
+export default function CommentPanel({ comments, onAdd, onResolve, onReply, onDelete, onClose, isEmbedded = false }) {
   const [newLine, setNewLine] = useState("");
   const [newText, setNewText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -141,20 +141,28 @@ export default function CommentPanel({ comments, onAdd, onResolve, onReply, onDe
   });
 
   return (
-    <div className="flex flex-col w-80 shrink-0 rounded-2xl overflow-hidden border border-line bg-surface shadow-xl">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-canvas shrink-0">
-        <div className="flex items-center gap-2">
-          <svg className="size-4 text-primary" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-          </svg>
-          <span className="text-xs font-bold text-fg uppercase tracking-wider">Comments</span>
-          <span className="text-[10px] text-faint bg-surface-2 px-1.5 py-0.5 rounded-full font-mono">
-            {comments.filter((c) => !c.resolved).length}
-          </span>
+    <div
+      className={
+        isEmbedded
+          ? "flex flex-col h-full overflow-hidden"
+          : "flex flex-col w-80 shrink-0 rounded-2xl overflow-hidden border border-line bg-surface shadow-xl"
+      }
+    >
+      {/* Header (hidden in embedded tab mode) */}
+      {!isEmbedded && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-canvas shrink-0">
+          <div className="flex items-center gap-2">
+            <svg className="size-4 text-primary" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+            </svg>
+            <span className="text-xs font-bold text-fg uppercase tracking-wider">Comments</span>
+            <span className="text-[10px] text-faint bg-surface-2 px-1.5 py-0.5 rounded-full font-mono">
+              {comments.filter((c) => !c.resolved).length}
+            </span>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-fg transition text-xs">✕</button>
         </div>
-        <button onClick={onClose} className="text-muted hover:text-fg transition text-xs">✕</button>
-      </div>
+      )}
 
       {/* Filter tabs */}
       <div className="flex gap-1 px-3 pt-2 pb-0 border-b border-line shrink-0">

@@ -22,6 +22,7 @@ export function createSocketServer(httpServer, deps) {
   const awarenessByRoom = new Map(); // roomId -> Map(socketId -> { clientId, update })
 
   store.onSaved = (roomId, at) => io.to(roomKey(roomId)).emit("room:saved", { roomId, at });
+  store.onServerUpdate = (roomId, update) => io.to(roomKey(roomId)).emit("yjs:update", { roomId, update });
 
   // 1) Who is connecting? The access token is sent in the handshake.
   io.use(async (socket, next) => {

@@ -2,13 +2,35 @@ import mongoose from "mongoose";
 
 const snapshotSchema = new mongoose.Schema(
   {
-    roomId:  { type: mongoose.Schema.Types.ObjectId, ref: "Room", required: true, index: true },
-    name:    { type: String, default: "" },          // optional label the user gives it
-    code:    { type: String, default: "" },
-    savedBy: { id: String, name: String },
+    room: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Room",
+      required: true,
+      index: true,
+    },
+    name: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    code: {
+      type: String,
+      default: "",
+    },
+    kind: {
+      type: String,
+      enum: ["manual", "pre-restore"],
+      default: "manual",
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Snapshot", snapshotSchema);
+snapshotSchema.index({ room: 1, createdAt: -1 });
 
+export default mongoose.model("Snapshot", snapshotSchema);

@@ -12,6 +12,7 @@ const server = http.createServer(app);
 // Socket.IO shares the same HTTP server as Express
 const { io, store } = initSockets(server);
 app.set("io", io); // the comment routes use this to announce changes
+app.set("store", store);
 
 connectDB().then(() => {
   server.listen(PORT, () => logger.info(`Server running on port ${PORT}`));

@@ -14,8 +14,11 @@ import LanguageBadge, { LANGUAGES } from "../components/ui/LanguageBadge";
 import PresenceBar from "../components/room/PresenceBar";
 import ConnectionStatus from "../components/room/ConnectionStatus";
 import CommentPanel from "../components/room/CommentPanel";
-import SnapshotModal from "../components/room/SnapshotModal";
+import HistoryPanel from "../components/room/HistoryPanel";
+import DiffView from "../components/room/DiffView";
 import ShareDialog from "../components/room/ShareDialog";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
+import { useToast } from "../components/ui/Toast";
 import { defineThemes } from "../lib/monacoThemes";
 import { can } from "../lib/permissions";
 
@@ -45,13 +48,22 @@ export default function Room() {
   const [stdin, setStdin] = useState("");
   const [showStdin, setShowStdin] = useState(false);
 
+  // Toast & Side Panel
+  const toast = useToast();
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [activeSideTab, setActiveSideTab] = useState("comments"); // "comments" | "history"
+
   // Comments
   const [comments, setComments] = useState([]);
-  const [commentPanelOpen, setCommentPanelOpen] = useState(false);
 
-  // Snapshots
+  // Snapshots & Diff View
   const [snapshots, setSnapshots] = useState([]);
-  const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [snapshotsLoading, setSnapshotsLoading] = useState(false);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [diffSnapshotId, setDiffSnapshotId] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Share & People dialog
   const [shareOpen, setShareOpen] = useState(false);
@@ -92,14 +104,16 @@ export default function Room() {
   // Load snapshots list
   const loadSnapshots = useCallback(() => {
     if (!roomId) return;
-    api.get(`/snapshots/${roomId}`)
+    setSnapshotsLoading(true);
+    api.get(`/rooms/${roomId}/snapshots`)
       .then((res) => setSnapshots(res.data.snapshots || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSnapshotsLoading(false));
   }, [roomId]);
 
   useEffect(() => { loadSnapshots(); }, [loadSnapshots]);
 
-  // Live comment socket events
+  // Live comment & snapshot socket events
   useEffect(() => {
     if (!collab?.socket) return;
     const socket = collab.socket;
@@ -113,17 +127,28 @@ export default function Room() {
     const onDeleted = ({ commentId }) =>
       setComments((prev) => prev.filter((c) => String(c._id) !== String(commentId)));
 
+    const onSnapshotsChanged = () => loadSnapshots();
+    const onRoomRestored = ({ name, by }) => {
+      toast.info(`${by || "A collaborator"} restored "${name || "a snapshot"}"`);
+      loadSnapshots();
+    };
+
     socket.on("comment:new", onNew);
     socket.on("comment:resolved", onResolved);
     socket.on("comment:reply", onReply);
     socket.on("comment:deleted", onDeleted);
+    socket.on("snapshots:changed", onSnapshotsChanged);
+    socket.on("room:restored", onRoomRestored);
+
     return () => {
       socket.off("comment:new", onNew);
       socket.off("comment:resolved", onResolved);
       socket.off("comment:reply", onReply);
       socket.off("comment:deleted", onDeleted);
+      socket.off("snapshots:changed", onSnapshotsChanged);
+      socket.off("room:restored", onRoomRestored);
     };
-  }, [collab?.socket]);
+  }, [collab?.socket, loadSnapshots, toast]);
 
   // Handle Save
   const handleSave = async () => {
@@ -201,28 +226,48 @@ export default function Room() {
 
   // Snapshot handlers
   const handleSaveSnapshot = async (name) => {
-    const code = getCode();
-    const { data } = await api.post("/snapshots", { roomId, name, code });
-    setSnapshots((prev) => [data.snapshot, ...prev]);
-  };
-  const handleDeleteSnapshot = async (id) => {
-    await api.delete(`/snapshots/${id}`);
-    setSnapshots((prev) => prev.filter((s) => s._id !== id));
-  };
-  const fetchSnapshot = async (id) => {
-    const { data } = await api.get(`/snapshots/single/${id}`);
-    return data.snapshot;
-  };
-  const handleLoadSnapshot = (code) => {
-    if (!code) return;
-    if (collab?.doc && collab?.ytext) {
-      collab.doc.transact(() => {
-        collab.ytext.delete(0, collab.ytext.length);
-        collab.ytext.insert(0, code);
-      });
-    } else if (editorRef.current) {
-      editorRef.current.setValue(code);
+    try {
+      const { data } = await api.post(`/rooms/${roomId}/snapshots`, { name });
+      toast.success(`Saved snapshot "${data.snapshot.name}"`);
+      loadSnapshots();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!restoreTarget) return;
+    setActionLoading(true);
+    try {
+      await api.post(`/rooms/${roomId}/snapshots/${restoreTarget._id}/restore`);
+      toast.success(`Restored "${restoreTarget.name}"`);
+      setRestoreTarget(null);
+      loadSnapshots();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setActionLoading(true);
+    try {
+      await api.delete(`/rooms/${roomId}/snapshots/${deleteTarget._id}`);
+      toast.success("Snapshot deleted");
+      setDeleteTarget(null);
+      loadSnapshots();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const fetchSnapshotCode = async (id) => {
+    const { data } = await api.get(`/rooms/${roomId}/snapshots/${id}`);
+    return data.snapshot.code;
   };
 
   // ── Error / loading / removed states ────────────────────────────────────
@@ -368,10 +413,17 @@ export default function Room() {
 
           {/* Comments */}
           <button
-            onClick={() => setCommentPanelOpen((o) => !o)}
+            onClick={() => {
+              if (sidePanelOpen && activeSideTab === "comments") {
+                setSidePanelOpen(false);
+              } else {
+                setSidePanelOpen(true);
+                setActiveSideTab("comments");
+              }
+            }}
             title="Code comments"
             className={`flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
-              commentPanelOpen
+              sidePanelOpen && activeSideTab === "comments"
                 ? "bg-white text-slate-900 border-white shadow-sm font-bold"
                 : "border-white/10 text-slate-300 hover:text-white bg-white/[0.08] hover:bg-white/[0.14]"
             }`}
@@ -379,19 +431,34 @@ export default function Room() {
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
             </svg>
-            {openComments > 0 && <span>{openComments}</span>}
+            <span className="hidden sm:inline">Comments</span>
+            {openComments > 0 && <span className="text-[11px] font-bold">{openComments}</span>}
           </button>
 
-          {/* Snapshots */}
+          {/* Snapshots / History */}
           <button
-            onClick={() => setSnapshotOpen(true)}
-            title="Version snapshots"
-            className="flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border border-white/10 text-slate-300 hover:text-white bg-white/[0.08] hover:bg-white/[0.14] transition cursor-pointer select-none"
+            onClick={() => {
+              if (sidePanelOpen && activeSideTab === "history") {
+                setSidePanelOpen(false);
+              } else {
+                setSidePanelOpen(true);
+                setActiveSideTab("history");
+              }
+            }}
+            title="Version history"
+            className={`flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
+              sidePanelOpen && activeSideTab === "history"
+                ? "bg-white text-slate-900 border-white shadow-sm font-bold"
+                : "border-white/10 text-slate-300 hover:text-white bg-white/[0.08] hover:bg-white/[0.14]"
+            }`}
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
             </svg>
-            <span className="hidden md:inline">Snapshots</span>
+            <span className="hidden md:inline">History</span>
+            {snapshots.length > 0 && (
+              <span className="text-[10px] opacity-75 font-mono">({snapshots.length})</span>
+            )}
           </button>
 
           {/* Save (only for editors and owner) */}
@@ -463,7 +530,7 @@ export default function Room() {
       <div className="flex flex-1 min-h-0 mx-4 my-3 gap-3">
 
         {/* Editor frame */}
-        <div className="flex flex-col flex-1 min-w-0 rounded-2xl overflow-hidden border border-line shadow-lg bg-surface">
+        <div className="flex flex-col flex-1 min-w-0 rounded-2xl overflow-hidden border border-line shadow-lg bg-surface relative">
           {/* Window chrome topbar */}
           <div className="flex items-center gap-3 px-4 py-2.5 bg-surface-2 border-b border-line shrink-0">
             <div className="flex gap-1.5">
@@ -498,18 +565,99 @@ export default function Room() {
               }}
             />
           </div>
+
+          {/* Diff View Overlay */}
+          <DiffView
+            open={diffOpen}
+            onClose={() => {
+              setDiffOpen(false);
+              setDiffSnapshotId(null);
+            }}
+            snapshots={snapshots}
+            currentCode={getCode()}
+            onRefreshCurrent={getCode}
+            language={room.language}
+            isDark={isDark}
+            initialSnapshotId={diffSnapshotId}
+            fetchSnapshotCode={fetchSnapshotCode}
+          />
         </div>
 
-        {/* Comment panel */}
-        {commentPanelOpen && (
-          <CommentPanel
-            comments={comments}
-            onAdd={handleAddComment}
-            onResolve={handleResolveComment}
-            onReply={handleReplyComment}
-            onDelete={handleDeleteComment}
-            onClose={() => setCommentPanelOpen(false)}
-          />
+        {/* Tabbed Side panel (Comments & History) */}
+        {sidePanelOpen && (
+          <div className="flex flex-col w-80 shrink-0 rounded-2xl overflow-hidden border border-line bg-surface shadow-xl">
+            {/* Header with Tabs */}
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-line bg-surface-2 shrink-0">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveSideTab("comments")}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                    activeSideTab === "comments"
+                      ? "bg-canvas text-fg shadow-xs font-bold"
+                      : "text-muted hover:text-fg"
+                  }`}
+                >
+                  <span>Comments</span>
+                  {openComments > 0 && (
+                    <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.2 rounded-full font-mono">
+                      {openComments}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSideTab("history")}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                    activeSideTab === "history"
+                      ? "bg-canvas text-fg shadow-xs font-bold"
+                      : "text-muted hover:text-fg"
+                  }`}
+                >
+                  <span>History</span>
+                  <span className="text-[10px] bg-surface text-muted px-1.5 py-0.2 rounded-full font-mono">
+                    {snapshots.length}
+                  </span>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSidePanelOpen(false)}
+                className="text-muted hover:text-fg text-xs p-1 cursor-pointer"
+                aria-label="Close panel"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Panel Content */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {activeSideTab === "comments" ? (
+                <CommentPanel
+                  comments={comments}
+                  onAdd={handleAddComment}
+                  onResolve={handleResolveComment}
+                  onReply={handleReplyComment}
+                  onDelete={handleDeleteComment}
+                  isEmbedded
+                />
+              ) : (
+                <HistoryPanel
+                  snapshots={snapshots}
+                  role={role}
+                  currentUserId={user?._id || user?.id}
+                  onSaveVersion={handleSaveSnapshot}
+                  onRestore={(snap) => setRestoreTarget(snap)}
+                  onDelete={(snap) => setDeleteTarget(snap)}
+                  onCompare={(snap) => {
+                    setDiffSnapshotId(snap._id);
+                    setDiffOpen(true);
+                  }}
+                  loading={snapshotsLoading}
+                />
+              )}
+            </div>
+          </div>
         )}
 
         {/* Console / Output Drawer */}
@@ -597,20 +745,29 @@ export default function Room() {
         onLeaveWorkspace={() => navigate("/dashboard")}
       />
 
-      {/* ── Snapshot Modal ───────────────────────────────────────────────────── */}
-      {snapshotOpen && (
-        <SnapshotModal
-          snapshots={snapshots}
-          currentCode={getCode()}
-          language={room.language}
-          isDark={isDark}
-          onSave={handleSaveSnapshot}
-          onDelete={handleDeleteSnapshot}
-          onClose={() => { setSnapshotOpen(false); loadSnapshots(); }}
-          onLoadSnapshot={handleLoadSnapshot}
-          fetchSnapshot={fetchSnapshot}
-        />
-      )}
+      {/* ── Restore Confirm Dialog ─────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!restoreTarget}
+        onClose={() => setRestoreTarget(null)}
+        onConfirm={handleConfirmRestore}
+        title="Restore version?"
+        message={`Replace the current code with "${restoreTarget?.name || "this version"}"? A backup of the current code is saved first.`}
+        confirmText="Restore version"
+        variant="primary"
+        loading={actionLoading}
+      />
+
+      {/* ── Delete Snapshot Confirm Dialog ───────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete snapshot?"
+        message={`Permanently delete snapshot "${deleteTarget?.name || "this snapshot"}"?`}
+        confirmText="Delete snapshot"
+        variant="danger"
+        loading={actionLoading}
+      />
     </div>
   );
 }

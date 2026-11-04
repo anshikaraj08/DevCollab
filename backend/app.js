@@ -38,11 +38,11 @@ app.get("/", (req, res) => res.json({ message: "DevCollab API running" }));
 app.use("/users", userRoutes);
 app.use("/rooms/:roomId/members", memberRoutes);
 app.use("/rooms/:roomId/invites", roomInviteRoutes);
+app.use("/rooms/:roomId/snapshots", snapshotRoutes);
 app.use("/rooms", roomRoutes);
 app.use("/invites", inviteRoutes);
 app.use("/run", runRoutes);
 app.use("/comments", commentRoutes);
-app.use("/snapshots", snapshotRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

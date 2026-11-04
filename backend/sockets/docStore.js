@@ -18,22 +18,53 @@ export class DocStore {
     this.saveRoom = saveRoom;
     this.logger = logger;
     this.onSaved = null;          // set by the socket server: (roomId, isoTime) => void
+    this.onServerUpdate = null;   // set by the socket server: (roomId, update) => void
     this.entries = new Map();     // roomId -> { doc, ytext, refs, ... }
     this.loading = new Map();     // roomId -> Promise (so two joins never load twice)
   }
  
   peek(roomId) {
-    return this.entries.get(roomId);
+    return this.entries.get(String(roomId));
+  }
+
+  /** Return the current code: from the active memory document if loaded, otherwise from DB. */
+  async getText(roomId) {
+    const id = String(roomId);
+    const entry = this.entries.get(id);
+    if (entry) return entry.ytext.toString();
+    const saved = await this.loadRoom(id);
+    return saved?.code ?? "";
+  }
+
+  /** Replace the room document's content with text in one transaction originating from "server". */
+  async replaceText(roomId, text) {
+    const id = String(roomId);
+    let entry = this.entries.get(id);
+    let acquired = false;
+    if (!entry) {
+      entry = await this.acquire(id);
+      acquired = true;
+    }
+    entry.doc.transact(() => {
+      const len = entry.ytext.length;
+      if (len > 0) entry.ytext.delete(0, len);
+      if (text) entry.ytext.insert(0, text);
+    }, "server");
+    if (acquired) {
+      await this.flush(id);
+      await this.release(id);
+    }
   }
  
   /** Load (or reuse) the document and count one more user of it. */
   async acquire(roomId) {
-    let entry = this.entries.get(roomId);
+    const id = String(roomId);
+    let entry = this.entries.get(id);
     if (!entry) {
-      let pending = this.loading.get(roomId);
+      let pending = this.loading.get(id);
       if (!pending) {
-        pending = this._load(roomId).finally(() => this.loading.delete(roomId));
-        this.loading.set(roomId, pending);
+        pending = this._load(id).finally(() => this.loading.delete(id));
+        this.loading.set(id, pending);
       }
       entry = await pending;
     }
@@ -44,23 +75,25 @@ export class DocStore {
  
   /** One user less. When nobody is left: save now, unload later. */
   async release(roomId) {
-    const entry = this.entries.get(roomId);
+    const id = String(roomId);
+    const entry = this.entries.get(id);
     if (!entry) return;
     entry.refs = Math.max(0, entry.refs - 1);
     if (entry.refs > 0) return;
-    await this.flush(roomId);
+    await this.flush(id);
     entry.idleTimer = setTimeout(() => {
       if (entry.refs === 0) {
         clearTimeout(entry.timer);
         entry.doc.destroy();
-        this.entries.delete(roomId);
+        this.entries.delete(id);
       }
     }, IDLE_UNLOAD_MS);
     entry.idleTimer.unref?.();
   }
  
   async flush(roomId) {
-    const entry = this.entries.get(roomId);
+    const id = String(roomId);
+    const entry = this.entries.get(id);
     if (entry && entry.dirtySince !== null) await this._save(entry);
   }
  
@@ -83,7 +116,12 @@ export class DocStore {
     }
  
     const entry = { roomId, doc, ytext, refs: 0, dirtySince: null, timer: null, idleTimer: null };
-    doc.on("update", () => this._markDirty(entry));
+    doc.on("update", (update, origin) => {
+      this._markDirty(entry);
+      if (origin === "server") {
+        this.onServerUpdate?.(roomId, update);
+      }
+    });
     this.entries.set(roomId, entry);
     if (firstTime) await this._save(entry);
     return entry;

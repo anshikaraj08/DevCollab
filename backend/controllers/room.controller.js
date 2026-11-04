@@ -1,6 +1,7 @@
 import Room from "../models/room.model.js";
 import Invite from "../models/invite.model.js";
 import Comment from "../models/comment.model.js";
+import Snapshot from "../models/snapshot.model.js";
 import ApiError from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import logger from "../utils/logger.js";
@@ -71,6 +72,7 @@ export const deleteRoom = asyncHandler(async (req, res) => {
     req.room.deleteOne(),
     Invite.deleteMany({ room: roomId }),
     Comment.deleteMany({ roomId }),
+    Snapshot.deleteMany({ room: roomId }),
   ]);
   logger.info({ roomId, userId: req.user.id }, "Room and associated data deleted");
   res.json({ message: "Room deleted" });
