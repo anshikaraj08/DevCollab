@@ -108,3 +108,4 @@ describe("Home Dashboard filters and role badges", () => {
     expect(screen.getByText("Shared Editor Room")).toBeInTheDocument();
   });
 });
+

@@ -21,7 +21,16 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
 // credentials: true lets the browser send the refresh-token cookie
 app.use(cors({ origin: env?.CLIENT_URL || process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
-app.use(pinoHttp({ logger }));
+app.use(
+  pinoHttp({
+    logger,
+    serializers: {
+      req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+      res: (res) => ({ statusCode: res.statusCode }),
+    },
+    customSuccessMessage: (req, res) => `${req.method} ${req.url} ${res.statusCode}`,
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 

@@ -22,3 +22,4 @@ describe("Auth 'next' redirect validation", () => {
     expect(getSafeNext("")).toBe("/dashboard");
   });
 });
+
