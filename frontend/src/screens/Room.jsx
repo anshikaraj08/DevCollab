@@ -276,7 +276,11 @@ export default function Room() {
 
   const lang = LANGUAGES[room.language] || {};
   const hasError = output && (output.stderr || output.code !== 0);
-  const presence = collab?.getPresence() ?? [];
+  const presence = collab?.awareness
+    ? Array.from(collab.awareness.getStates().values())
+        .map((s) => s.user)
+        .filter(Boolean)
+    : [];
   const openComments = comments.filter((c) => !c.resolved).length;
 
   return (

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+
 import { render, screen } from "@testing-library/react";
 import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 import Landing from "../screens/Landing";
@@ -129,3 +129,4 @@ describe("Screen Render Diagnostics", () => {
     expect(screen.queryByText(/Something went wrong/i)).not.toBeInTheDocument();
   });
 });
+
