@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
- 
+
 const roomSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
@@ -9,8 +9,14 @@ const roomSchema = new mongoose.Schema(
     yState: { type: Buffer, select: false },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     users: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    // Phase 3: roles mapping userId -> "editor" | "viewer" (owner is always createdBy)
+    roles: {
+      type: Map,
+      of: { type: String, enum: ["editor", "viewer"] },
+      default: {},
+    },
   },
   { timestamps: true }
 );
- 
+
 export default mongoose.model("Room", roomSchema);

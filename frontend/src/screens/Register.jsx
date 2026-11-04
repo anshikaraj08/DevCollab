@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import api, { setAccessToken } from "../config/axios";
 import getErrorMessage from "../config/getErrorMessage";
 import { UserContext } from "../context/user.context";
@@ -14,6 +14,16 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
   const { setUser } = useContext(UserContext);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const getSafeNext = () => {
+    const params = new URLSearchParams(location.search);
+    const next = params.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      return next;
+    }
+    return "/dashboard";
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -23,7 +33,7 @@ export default function Register() {
       const { data } = await api.post("/users/register", { name, email, password });
       setAccessToken(data.accessToken);
       setUser(data.user);
-      navigate("/dashboard");
+      navigate(getSafeNext(), { replace: true });
     } catch (err) {
       setError(getErrorMessage(err, "Registration failed"));
       setSubmitting(false);
@@ -37,7 +47,7 @@ export default function Register() {
       footer={
         <>
           Already a member?{" "}
-          <Link to="/login" className="font-bold text-fg hover:underline">
+          <Link to={`/login${location.search}`} className="font-bold text-fg hover:underline">
             Log in
           </Link>
         </>
@@ -53,20 +63,18 @@ export default function Register() {
           </p>
         )}
 
-        {/* Full Name */}
         <div>
           <input
             type="text"
             autoComplete="name"
-            placeholder="Full Name, e.g. Anshika Raj"
+            placeholder="Your name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="w-full h-11 rounded-full border border-line-strong bg-surface px-5 text-sm text-fg placeholder:text-faint outline-none focus:border-fg transition"
+            className="w-full h-11 px-4 rounded-xl border border-line bg-surface text-fg text-sm placeholder:text-muted focus:outline-none focus:border-fg transition"
           />
         </div>
 
-        {/* Email */}
         <div>
           <input
             type="email"
@@ -75,39 +83,37 @@ export default function Register() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full h-11 rounded-full border border-line-strong bg-surface px-5 text-sm text-fg placeholder:text-faint outline-none focus:border-fg transition"
+            className="w-full h-11 px-4 rounded-xl border border-line bg-surface text-fg text-sm placeholder:text-muted focus:outline-none focus:border-fg transition"
           />
         </div>
 
-        {/* Password */}
         <div className="relative">
           <input
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
-            placeholder="Password (minimum 6 characters)"
+            placeholder="Password (min 6 characters)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-            className="w-full h-11 rounded-full border border-line-strong bg-surface px-5 pr-11 text-sm text-fg placeholder:text-faint outline-none focus:border-fg transition"
+            className="w-full h-11 px-4 pr-11 rounded-xl border border-line bg-surface text-fg text-sm placeholder:text-muted focus:outline-none focus:border-fg transition"
           />
           <button
             type="button"
-            onClick={() => setShowPassword((s) => !s)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-fg text-xs p-1 cursor-pointer transition"
-            title={showPassword ? "Hide password" : "Show password"}
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg transition text-xs font-semibold cursor-pointer select-none"
+            aria-label={showPassword ? "Hide password" : "Show password"}
           >
-            {showPassword ? "🙈" : "👁"}
+            {showPassword ? "Hide" : "Show"}
           </button>
         </div>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={submitting}
-          className="w-full h-11 rounded-full font-bold text-sm bg-primary text-primary-fg hover:opacity-90 active:scale-[0.99] transition disabled:opacity-50 cursor-pointer shadow-xs mt-2"
+          className="w-full h-11 rounded-full bg-primary text-primary-fg font-bold text-sm tracking-wide hover:opacity-90 active:scale-[0.99] transition disabled:opacity-50 cursor-pointer shadow-sm"
         >
-          {submitting ? "Creating account…" : "Create account"}
+          {submitting ? "Creating account..." : "Create account"}
         </button>
       </form>
     </AuthLayout>

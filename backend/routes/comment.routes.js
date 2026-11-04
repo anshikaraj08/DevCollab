@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authUser } from "../middleware/auth.middleware.js";
+import { roomAccess } from "../middleware/roomAccess.middleware.js";
 import {
   getComments,
   addComment,
@@ -12,11 +13,11 @@ import {
 const router = Router();
 router.use(authUser);
 
-router.get("/:roomId",                    getComments);
-router.post("/:roomId",                   addComment);
-router.patch("/:commentId/resolve",       resolveComment);
-router.patch("/:commentId/unresolve",     unresolveComment);
-router.post("/:commentId/reply",          addReply);
-router.delete("/:commentId",              deleteComment);
+router.get("/:roomId",                roomAccess("room.read"), getComments);
+router.post("/:roomId",               roomAccess("comment.write"), addComment);
+router.patch("/:commentId/resolve",   resolveComment);
+router.patch("/:commentId/unresolve", unresolveComment);
+router.post("/:commentId/reply",      addReply);
+router.delete("/:commentId",          deleteComment);
 
 export default router;

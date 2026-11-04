@@ -7,8 +7,14 @@ import { UserContext } from "../context/user.context";
 import { LANGUAGES, languageLabel } from "../components/ui/LanguageBadge";
 import { cn } from "../lib/cn";
 
-const FILTER_TABS = [
+const SCOPE_TABS = [
   { value: "all", label: "All" },
+  { value: "mine", label: "Mine" },
+  { value: "shared", label: "Shared" },
+];
+
+const FILTER_TABS = [
+  { value: "all", label: "All Languages" },
   { value: "javascript", label: "JavaScript" },
   { value: "cpp", label: "C++" },
   { value: "python", label: "Python" },
@@ -29,6 +35,7 @@ export default function Home() {
   const [rooms, setRooms] = useState(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [scope, setScope] = useState("all");
   const [filter, setFilter] = useState("all");
 
   // Inline creation state
@@ -80,16 +87,29 @@ export default function Home() {
     }
   };
 
+  const currentUserId = user?._id || user?.id;
+
   const visible = useMemo(() => {
     const text = query.trim().toLowerCase();
     return (rooms ?? []).filter((room) => {
+      const isOwner =
+        room.role === "owner" ||
+        (currentUserId &&
+          (room.createdBy === currentUserId ||
+            room.createdBy?._id === currentUserId));
+
+      const matchScope =
+        scope === "all" ||
+        (scope === "mine" && isOwner) ||
+        (scope === "shared" && !isOwner);
+
       const matchFilter = filter === "all" || room.language === filter;
       const matchQuery =
         !text ||
         `${room.title} ${languageLabel(room.language)}`.toLowerCase().includes(text);
-      return matchFilter && matchQuery;
+      return matchScope && matchFilter && matchQuery;
     });
-  }, [rooms, query, filter]);
+  }, [rooms, query, filter, scope, currentUserId]);
 
   return (
     <PageContainer className="py-8 sm:py-10">
@@ -158,20 +178,44 @@ export default function Home() {
         </div>
 
         {/* ── 3. Search & Filter Bar ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-          {/* Search Input */}
-          <div className="relative flex-1 max-w-sm">
-            <input
-              type="search"
-              aria-label="Search workspaces"
-              placeholder="Search workspaces…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full h-10 rounded-full border border-line bg-surface px-4 text-xs sm:text-sm text-fg outline-none placeholder:text-faint focus:border-fg transition"
-            />
+        <div className="flex flex-col gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Scope Tabs: All / Mine / Shared */}
+            <div className="inline-flex items-center p-1 rounded-full bg-surface-2 border border-line text-xs font-medium w-fit shrink-0">
+              {SCOPE_TABS.map((tab) => {
+                const active = scope === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setScope(tab.value)}
+                    className={cn(
+                      "px-3.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer",
+                      active
+                        ? "bg-surface text-fg shadow-xs border border-line"
+                        : "text-muted hover:text-fg"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-sm">
+              <input
+                type="search"
+                aria-label="Search workspaces"
+                placeholder="Search workspaces…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full h-9 rounded-full border border-line bg-surface px-4 text-xs sm:text-sm text-fg outline-none placeholder:text-faint focus:border-fg transition"
+              />
+            </div>
           </div>
 
-          {/* Filter Pills */}
+          {/* Language Filter Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {FILTER_TABS.map((tab) => {
               const active = filter === tab.value;
@@ -181,7 +225,7 @@ export default function Home() {
                   type="button"
                   onClick={() => setFilter(tab.value)}
                   className={cn(
-                    "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer border",
+                    "px-3.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer border",
                     active
                       ? "bg-fg text-canvas border-fg"
                       : "bg-surface text-muted border-line hover:text-fg hover:border-fg/30"
@@ -217,8 +261,8 @@ export default function Home() {
             <div className="rounded-2xl border border-line border-dashed bg-surface/50 p-12 text-center">
               <p className="text-sm font-semibold text-fg">No workspaces found</p>
               <p className="mt-1 text-xs text-muted">
-                {query || filter !== "all"
-                  ? "Try adjusting your search or language filter."
+                {query || filter !== "all" || scope !== "all"
+                  ? "Try adjusting your search or filters."
                   : "Create your first room above to start coding."}
               </p>
             </div>
@@ -226,7 +270,11 @@ export default function Home() {
             <div className="grid gap-4 sm:grid-cols-2">
               {visible.map((room) => {
                 const langStyle = LANGUAGES[room.language] || {};
-                const isOwner = user && (room.createdBy === user._id || room.createdBy === user.id);
+                const isOwner =
+                  room.role === "owner" ||
+                  (currentUserId &&
+                    (room.createdBy === currentUserId ||
+                      room.createdBy?._id === currentUserId));
 
                 return (
                   <div
@@ -236,17 +284,33 @@ export default function Home() {
                       langStyle.hover ?? "hover:border-fg/40"
                     )}
                   >
-                    {/* Top Row: Language Badge + Open link */}
+                    {/* Top Row: Language Badge + Role Badge (if not owner) + Open link */}
                     <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-mono font-semibold transition",
-                          langStyle.badge ?? "bg-surface-2 text-muted border-line"
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-mono font-semibold transition",
+                            langStyle.badge ?? "bg-surface-2 text-muted border-line"
+                          )}
+                        >
+                          <span className={cn("size-2 rounded-full", langStyle.dot ?? "bg-faint")} />
+                          {languageLabel(room.language)}
+                        </span>
+
+                        {!isOwner && (
+                          <span
+                            data-testid="role-badge"
+                            className={cn(
+                              "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border",
+                              room.role === "viewer"
+                                ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                            )}
+                          >
+                            {room.role === "viewer" ? "Viewer" : "Editor"}
+                          </span>
                         )}
-                      >
-                        <span className={cn("size-2 rounded-full", langStyle.dot ?? "bg-faint")} />
-                        {languageLabel(room.language)}
-                      </span>
+                      </div>
 
                       <Link
                         to={`/room/${room._id}`}
@@ -264,9 +328,17 @@ export default function Home() {
                       </h3>
                     </Link>
 
-                    {/* Footer Row: Timestamp + Owner delete */}
+                    {/* Footer Row: Timestamp + Member count + Owner delete */}
                     <div className="mt-4 pt-2 border-t border-line/60 flex items-center justify-between text-xs text-muted font-mono">
-                      <span>Updated {formatDate(room.updatedAt || room.createdAt)}</span>
+                      <div className="flex items-center gap-3">
+                        <span>Updated {formatDate(room.updatedAt || room.createdAt)}</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-faint" title={`${room.memberCount ?? room.users?.length ?? 1} members`}>
+                          <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          {room.memberCount ?? room.users?.length ?? 1}
+                        </span>
+                      </div>
                       {isOwner && (
                         <button
                           type="button"

@@ -7,7 +7,7 @@ const toBytes = (x) => (x instanceof Uint8Array ? x : x ? new Uint8Array(x) : nu
 
 /**
  * One instance = one user inside one room.
- * status: "connecting" | "synced" | "disconnected" | "forbidden" | "error"
+ * status: "connecting" | "synced" | "disconnected" | "forbidden" | "removed" | "error"
  */
 export class CollabClient {
   constructor({ socket, roomId, user }) {
@@ -24,6 +24,7 @@ export class CollabClient {
     this.status = "connecting";
     this.error = null;
     this.room = null;
+    this.role = "editor";
     this.lastSavedAt = null;
     this.binding = null;
     this.subscribers = new Set();
@@ -56,6 +57,17 @@ export class CollabClient {
           this.notify();
         }
       },
+      "room:role": (msg) => {
+        if (msg.roomId === this.roomId) {
+          this.role = msg.role;
+          this.notify();
+        }
+      },
+      "room:removed": (msg) => {
+        if (msg.roomId === this.roomId) {
+          this.setStatus("removed");
+        }
+      },
       "room:error": (msg) => {
         this.error = msg.error;
         this.notify();
@@ -63,9 +75,9 @@ export class CollabClient {
     };
     for (const [event, fn] of Object.entries(this.handlers)) socket.on(event, fn);
 
-    // my edits -> server (only while synced; after a reconnect join() sends what was missed)
+    // my edits -> server (only while synced and not a viewer; after a reconnect join() sends what was missed)
     this.onDocUpdate = (update, origin) => {
-      if (origin === "remote" || this.status !== "synced") return;
+      if (origin === "remote" || this.status !== "synced" || this.role === "viewer") return;
       this.socket.emit("yjs:update", { roomId: this.roomId, update });
     };
     this.doc.on("update", this.onDocUpdate);
@@ -95,11 +107,12 @@ export class CollabClient {
         Y.applyUpdate(this.doc, serverState, "remote");
       }
       this.room = res.room;
+      this.role = res.room?.role || "editor";
       this.status = "synced";
       this.error = null;
 
       // send what the server does not have yet (edits typed while offline)
-      if (serverState) {
+      if (serverState && this.role !== "viewer") {
         const missing = Y.encodeStateAsUpdate(this.doc, Y.encodeStateVectorFromUpdate(serverState));
         if (missing.byteLength > 2) this.socket.emit("yjs:update", { roomId: this.roomId, update: missing });
       }
@@ -129,15 +142,10 @@ export class CollabClient {
     this.binding = null;
   }
 
-  /** People in the room, one entry per person (a person with two tabs counts once). */
-  getPresence() {
-    const people = new Map();
-    this.awareness.getStates().forEach((state) => {
-      if (state.user && !people.has(state.user.id)) {
-        people.set(state.user.id, { ...state.user, self: state.user.id === this.user.id });
-      }
-    });
-    return [...people.values()];
+  setStatus(status, error = null) {
+    this.status = status;
+    this.error = error;
+    this.notify();
   }
 
   subscribe(fn) {
@@ -146,26 +154,19 @@ export class CollabClient {
   }
 
   notify() {
-    for (const fn of [...this.subscribers]) fn();
-  }
-
-  setStatus(status, error = null) {
-    this.status = status;
-    this.error = error;
-    this.notify();
+    for (const fn of this.subscribers) fn(this);
   }
 
   destroy() {
-    if (this.destroyed) return;
     this.destroyed = true;
-    this.detachEditor();
-    if (this.socket.connected) this.socket.emit("room:leave", { roomId: this.roomId });
     for (const [event, fn] of Object.entries(this.handlers)) this.socket.off(event, fn);
     this.doc.off("update", this.onDocUpdate);
     this.awareness.off("update", this.onAwarenessUpdate);
     this.awareness.off("change", this.onAwarenessChange);
+    this.detachEditor();
+    this.subscribers.clear();
+    this.socket.emit("room:leave", { roomId: this.roomId });
     this.awareness.destroy();
     this.doc.destroy();
-    this.subscribers.clear();
   }
 }
