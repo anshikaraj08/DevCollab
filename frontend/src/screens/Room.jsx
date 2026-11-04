@@ -17,6 +17,7 @@ import CommentPanel from "../components/room/CommentPanel";
 import HistoryPanel from "../components/room/HistoryPanel";
 import DiffView from "../components/room/DiffView";
 import ShareDialog from "../components/room/ShareDialog";
+import ConsoleDrawer from "../components/room/ConsoleDrawer";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { useToast } from "../components/ui/Toast";
 import { defineThemes } from "../lib/monacoThemes";
@@ -45,8 +46,7 @@ export default function Room() {
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [stdin, setStdin] = useState("");
-  const [showStdin, setShowStdin] = useState(false);
+  const [consoleTab, setConsoleTab] = useState("output");
 
   // Toast & Side Panel
   const toast = useToast();
@@ -140,12 +140,17 @@ export default function Room() {
       loadSnapshots();
     };
 
+    const onTestsUpdated = ({ cases }) => {
+      setRoom((prev) => (prev ? { ...prev, testCases: cases } : prev));
+    };
+
     socket.on("comment:new", onNew);
     socket.on("comment:resolved", onResolved);
     socket.on("comment:reply", onReply);
     socket.on("comment:deleted", onDeleted);
     socket.on("snapshots:changed", onSnapshotsChanged);
     socket.on("room:restored", onRoomRestored);
+    socket.on("tests:updated", onTestsUpdated);
 
     return () => {
       socket.off("comment:new", onNew);
@@ -154,6 +159,7 @@ export default function Room() {
       socket.off("comment:deleted", onDeleted);
       socket.off("snapshots:changed", onSnapshotsChanged);
       socket.off("room:restored", onRoomRestored);
+      socket.off("tests:updated", onTestsUpdated);
     };
   }, [collab?.socket, collab, loadSnapshots, toast]);
 
@@ -207,20 +213,53 @@ export default function Room() {
   });
 
   // Handle Run
-  const run = async () => {
+  const run = async (customStdin) => {
     setRunning(true);
     setPanelOpen(true);
+    let effectiveStdin = customStdin;
+    if (effectiveStdin === undefined) {
+      try {
+        effectiveStdin = localStorage.getItem(`devcollab:stdin:${roomId}`) || "";
+      } catch {
+        effectiveStdin = "";
+      }
+    }
     setOutput(null);
     try {
       const codeToRun = getCode();
       const payload = { language: room.language, code: codeToRun };
-      if (stdin.trim()) payload.stdin = stdin;
+      if (effectiveStdin && effectiveStdin.trim()) {
+        payload.stdin = effectiveStdin;
+      }
       const { data } = await api.post("/run", payload);
       setOutput(data);
+      return data;
     } catch (err) {
-      setOutput({ stderr: getErrorMessage(err, "Execution failed"), code: -1 });
+      const isRateLimit = err?.response?.status === 429;
+      const errOut = {
+        stdout: "",
+        stderr: isRateLimit
+          ? "Rate limited. Max 30 runs per minute."
+          : getErrorMessage(err, "Execution failed"),
+        code: -1,
+      };
+      setOutput(errOut);
+      if (isRateLimit) {
+        toast.error("Execution rate limit reached (30/min). Please slow down.");
+        throw err;
+      }
+      return errOut;
     } finally {
       setRunning(false);
+    }
+  };
+
+  const handleUpdateTestCases = async (newCases) => {
+    try {
+      await api.put(`/rooms/${roomId}/tests`, { cases: newCases });
+      setRoom((prev) => (prev ? { ...prev, testCases: newCases } : prev));
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to update test cases"));
     }
   };
 
@@ -574,9 +613,27 @@ export default function Room() {
             </button>
           )}
 
+          {/* Console / Tests Toggle */}
+          <button
+            type="button"
+            onClick={() => setPanelOpen((v) => !v)}
+            title="Toggle Console & Tests"
+            className={`flex items-center gap-1.5 h-9 px-3 sm:px-3.5 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
+              panelOpen
+                ? "bg-white/20 border-white/30 text-white"
+                : "bg-white/[0.08] hover:bg-white/[0.14] border-white/10 text-white"
+            }`}
+          >
+            <span className="size-2 rounded-full bg-emerald-500" />
+            <span className="hidden md:inline">Console</span>
+            {(room?.testCases?.length || 0) > 0 && (
+              <span className="text-[10px] opacity-75 font-mono">({room.testCases.length})</span>
+            )}
+          </button>
+
           {/* Run */}
           <button
-            onClick={run}
+            onClick={() => run()}
             disabled={running}
             className="flex items-center gap-1.5 h-9 px-4 sm:px-5 rounded-full text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 active:scale-95 transition disabled:opacity-50 cursor-pointer shadow-sm select-none"
           >
@@ -745,78 +802,21 @@ export default function Room() {
         )}
 
         {/* Console / Output Drawer */}
-        {panelOpen && (
-          <div className="flex flex-col w-96 rounded-2xl border border-line bg-surface shadow-xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 bg-surface-2 border-b border-line">
-              <div className="flex items-center gap-2">
-                <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted">Console</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowStdin((v) => !v)}
-                  className={`text-[11px] font-mono px-2 py-0.5 rounded cursor-pointer transition ${
-                    showStdin ? "bg-surface text-fg shadow-xs" : "text-muted hover:text-fg"
-                  }`}
-                >
-                  stdin {stdin.trim() ? "•" : ""}
-                </button>
-                <button
-                  onClick={() => setPanelOpen(false)}
-                  className="text-muted hover:text-fg text-sm cursor-pointer p-0.5"
-                  aria-label="Close output"
-                >
-                  &times;
-                </button>
-              </div>
-            </div>
-
-            {/* Standard input area */}
-            {showStdin && (
-              <div className="p-3 border-b border-line bg-surface-2/40">
-                <textarea
-                  value={stdin}
-                  onChange={(e) => setStdin(e.target.value)}
-                  placeholder="Enter stdin for your program..."
-                  className="w-full h-16 p-2 rounded-lg border border-line bg-canvas font-mono text-xs text-fg placeholder:text-muted focus:outline-none"
-                />
-              </div>
-            )}
-
-            {/* Output body */}
-            <div className="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed">
-              {running && (
-                <div className="flex items-center gap-2 text-muted italic">
-                  <span className={lang.dot ? lang.dot.replace("bg-", "text-") : "text-fg"}>$</span>
-                  <span>Compiling &amp; executing…</span>
-                </div>
-              )}
-              {!running && output && (
-                <>
-                  <div className={`text-[11px] mb-2 font-bold ${lang.dot ? lang.dot.replace("bg-", "text-") : "text-fg"}`}>
-                    $ run {room.language}
-                  </div>
-                  {output.stdout && (
-                    <pre className="text-fg whitespace-pre-wrap break-all mb-3">{output.stdout}</pre>
-                  )}
-                  {output.stderr && (
-                    <pre className="text-red-400 whitespace-pre-wrap break-all mb-3">{output.stderr}</pre>
-                  )}
-                  {!output.stdout && !output.stderr && (
-                    <span className="text-faint italic block mb-2">(no output)</span>
-                  )}
-                  <div className={`mt-3 text-[11px] font-bold ${hasError ? "text-red-400" : "text-muted"}`}>
-                    {hasError ? "✕" : "✓"} Exited with code {output.code}
-                  </div>
-                </>
-              )}
-              {!running && !output && (
-                <span className="text-faint italic">Hit Run to execute code.</span>
-              )}
-            </div>
-          </div>
-        )}
+        <ConsoleDrawer
+          open={panelOpen}
+          onClose={() => setPanelOpen(false)}
+          roomId={roomId}
+          role={role}
+          running={running}
+          output={output}
+          onRun={run}
+          testCases={room?.testCases || []}
+          onUpdateTestCases={handleUpdateTestCases}
+          lang={lang}
+          hasError={hasError}
+          activeTab={consoleTab}
+          setActiveTab={setConsoleTab}
+        />
       </div>
 
       {/* ── Share & Access Modal ─────────────────────────────────────────────── */}

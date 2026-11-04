@@ -142,6 +142,12 @@ export class CollabClient {
     this.binding = null;
   }
 
+  getPresence() {
+    return Array.from(this.awareness.getStates().values())
+      .map((s) => s.user)
+      .filter(Boolean);
+  }
+
   undo() {
     return this.binding?.undo();
   }

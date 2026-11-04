@@ -15,6 +15,14 @@ const roomSchema = new mongoose.Schema(
       of: { type: String, enum: ["editor", "viewer"] },
       default: {},
     },
+    // Phase 3 Stage 4: shared test cases
+    testCases: [
+      {
+        name: { type: String, default: "Test Case", trim: true },
+        input: { type: String, default: "" },
+        expected: { type: String, default: "" },
+      },
+    ],
   },
   { timestamps: true }
 );
