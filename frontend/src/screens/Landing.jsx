@@ -5,6 +5,11 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import api from "../config/axios";
 import { UserContext } from "../context/user.context";
+import {
+  ReviewRoomsIllustration,
+  CompilerIllustration,
+  EditorIllustration,
+} from "../components/landing/FeatureIllustrations";
 
 const CODE_SAMPLES = {
   cpp: {
@@ -85,16 +90,22 @@ const FEATURES = [
     title: "Dedicated Review Rooms",
     text: "Create a persistent workspace room for each code snippet, pick its language, and share the room URL with teammates.",
     icon: "🗂️",
+    badge: "Multiplayer",
+    illustration: ReviewRoomsIllustration,
   },
   {
     title: "Multi-Language Compiler",
     text: "Compile and run C++, Python, JavaScript, and Java directly in the browser powered by the Wandbox API with live stdout/stderr.",
     icon: "⚡",
+    badge: "Wandbox API",
+    illustration: CompilerIllustration,
   },
   {
     title: "Monaco Code Editor",
     text: "Industry-standard editor with syntax highlighting, clean neutral dark/light theme, auto-indent, and instant code saving.",
     icon: "💻",
+    badge: "VS Code Core",
+    illustration: EditorIllustration,
   },
 ];
 
@@ -350,15 +361,42 @@ export default function Landing() {
             </div>
           </Card>
 
-          {/* 3 Features */}
-          <div className="grid gap-4 md:grid-cols-3">
-            {FEATURES.map((f) => (
-              <Card key={f.title} className="p-6 space-y-2">
-                <span className="text-xl">{f.icon}</span>
-                <h3 className="text-sm font-semibold">{f.title}</h3>
-                <p className="text-xs text-muted leading-relaxed">{f.text}</p>
-              </Card>
-            ))}
+          {/* 3 Illustrated Feature Cards */}
+          <div className="grid gap-6 md:grid-cols-3">
+            {FEATURES.map((f) => {
+              const Illustration = f.illustration;
+              return (
+                <Card
+                  key={f.title}
+                  className="group overflow-hidden rounded-2xl border border-line bg-surface hover:border-fg/20 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Visual Picture Illustration */}
+                    <Illustration />
+
+                    {/* Card Content */}
+                    <div className="p-5 sm:p-6 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xl p-2 rounded-xl bg-surface-2 border border-line shadow-2xs">
+                          {f.icon}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-surface-2 border border-line text-muted">
+                          {f.badge}
+                        </span>
+                      </div>
+
+                      <h3 className="text-base font-bold text-fg group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        {f.title}
+                      </h3>
+
+                      <p className="text-xs sm:text-sm text-muted leading-relaxed">
+                        {f.text}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         </PageContainer>
       </section>
