@@ -70,8 +70,8 @@ export default function Logo({ size = "md", showText = true }) {
       {/* ── Brand Typography: DevCollab ── */}
       {showText && (
         <span className={`${dims.text} tracking-tight leading-none flex items-baseline select-none`}>
-          <span className="font-black text-fg">Dev</span>
-          <span className="font-black text-emerald-600 dark:text-emerald-400 ml-[1.5px]">Collab</span>
+          <span className="font-black text-white">Dev</span>
+          <span className="font-black text-emerald-400 ml-[1.5px]">Collab</span>
         </span>
       )}
     </span>
