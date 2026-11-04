@@ -8,3 +8,4 @@ export const createSnapshotSchema = z.object({
     .max(MAX_SNAPSHOT_NAME_CHARS, `Name cannot exceed ${MAX_SNAPSHOT_NAME_CHARS} characters`)
     .optional(),
 });
+

@@ -142,6 +142,18 @@ export class CollabClient {
     this.binding = null;
   }
 
+  undo() {
+    return this.binding?.undo();
+  }
+
+  redo() {
+    return this.binding?.redo();
+  }
+
+  clearHistory() {
+    this.binding?.clearHistory();
+  }
+
   setStatus(status, error = null) {
     this.status = status;
     this.error = error;

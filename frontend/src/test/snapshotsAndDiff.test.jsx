@@ -184,3 +184,4 @@ describe("DiffView Overlay Component", () => {
     expect(handleClose).toHaveBeenCalled();
   });
 });
+

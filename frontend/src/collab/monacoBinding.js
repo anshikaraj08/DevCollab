@@ -43,6 +43,41 @@ export class MonacoBinding {
     awareness.on("change", this.awarenessListener);
     this.publishSelection();
     this.renderRemoteCursors();
+
+    // 5) Collaborative Undo/Redo Manager (tracks only this binding's local edits)
+    this.undoManager = new Y.UndoManager(this.ytext, {
+      trackedOrigins: new Set([this]),
+    });
+    this.onStackChange = null;
+    const emitStackChange = () => {
+      this.onStackChange?.({
+        canUndo: this.canUndo(),
+        canRedo: this.canRedo(),
+      });
+    };
+    this.undoManager.on("stack-item-added", emitStackChange);
+    this.undoManager.on("stack-item-popped", emitStackChange);
+    this.undoManager.on("stack-cleared", emitStackChange);
+  }
+
+  undo() {
+    return this.undoManager?.undo();
+  }
+
+  redo() {
+    return this.undoManager?.redo();
+  }
+
+  clearHistory() {
+    this.undoManager?.clear();
+  }
+
+  canUndo() {
+    return (this.undoManager?.undoStack?.length ?? 0) > 0;
+  }
+
+  canRedo() {
+    return (this.undoManager?.redoStack?.length ?? 0) > 0;
   }
 
   onEditorChange(event) {
@@ -139,6 +174,7 @@ export class MonacoBinding {
   }
 
   destroy() {
+    this.undoManager?.destroy();
     this.ytext.unobserve(this.yObserver);
     this.modelListener?.dispose();
     this.cursorListener?.dispose();

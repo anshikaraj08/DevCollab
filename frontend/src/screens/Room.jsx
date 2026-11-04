@@ -65,6 +65,10 @@ export default function Room() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Undo & Redo state
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
   // Share & People dialog
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -129,6 +133,9 @@ export default function Room() {
 
     const onSnapshotsChanged = () => loadSnapshots();
     const onRoomRestored = ({ name, by }) => {
+      collab?.clearHistory();
+      setCanUndo(false);
+      setCanRedo(false);
       toast.info(`${by || "A collaborator"} restored "${name || "a snapshot"}"`);
       loadSnapshots();
     };
@@ -148,7 +155,28 @@ export default function Room() {
       socket.off("snapshots:changed", onSnapshotsChanged);
       socket.off("room:restored", onRoomRestored);
     };
-  }, [collab?.socket, loadSnapshots, toast]);
+  }, [collab?.socket, collab, loadSnapshots, toast]);
+
+  // When editor becomes read-only or status is not synced, clear undo history
+  useEffect(() => {
+    if (!canEdit || collab?.status !== "synced") {
+      collab?.clearHistory();
+      setCanUndo(false);
+      setCanRedo(false);
+    }
+  }, [canEdit, collab?.status, collab]);
+
+  // Synchronize stack changes with active binding
+  useEffect(() => {
+    if (!collab?.binding) return;
+    const b = collab.binding;
+    b.onStackChange = ({ canUndo: u, canRedo: r }) => {
+      setCanUndo(u);
+      setCanRedo(r);
+    };
+    setCanUndo(b.canUndo());
+    setCanRedo(b.canRedo());
+  }, [collab?.binding]);
 
   // Handle Save
   const handleSave = async () => {
@@ -203,7 +231,31 @@ export default function Room() {
   const onMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    collab?.attachEditor(editor, monaco);
+    const binding = collab?.attachEditor(editor, monaco);
+    if (binding) {
+      binding.onStackChange = ({ canUndo: u, canRedo: r }) => {
+        setCanUndo(u);
+        setCanRedo(r);
+      };
+      setCanUndo(binding.canUndo());
+      setCanRedo(binding.canRedo());
+    }
+
+    // Register custom undo & redo commands that override Monaco's built-in handling
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyZ, () => {
+      if (!canEdit || collab?.status !== "synced") return;
+      collab?.undo();
+    });
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyZ, () => {
+      if (!canEdit || collab?.status !== "synced") return;
+      collab?.redo();
+    });
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY, () => {
+      if (!canEdit || collab?.status !== "synced") return;
+      collab?.redo();
+    });
   };
 
   // Comment handlers
@@ -460,6 +512,38 @@ export default function Room() {
               <span className="text-[10px] opacity-75 font-mono">({snapshots.length})</span>
             )}
           </button>
+
+          {/* Undo and Redo (hidden for viewers, disabled when stack empty) */}
+          {!isViewer && (
+            <div className="flex items-center rounded-full border border-white/10 bg-white/[0.08] p-0.5" role="group" aria-label="Undo and redo">
+              <button
+                type="button"
+                onClick={() => collab?.undo()}
+                disabled={!canUndo || !canEdit}
+                title="Undo (Ctrl+Z)"
+                className="size-8 rounded-full flex items-center justify-center text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition cursor-pointer select-none"
+                aria-label="Undo"
+              >
+                <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7v6h6" />
+                  <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => collab?.redo()}
+                disabled={!canRedo || !canEdit}
+                title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+                className="size-8 rounded-full flex items-center justify-center text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition cursor-pointer select-none"
+                aria-label="Redo"
+              >
+                <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 7v6h-6" />
+                  <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7" />
+                </svg>
+              </button>
+            </div>
+          )}
 
           {/* Save (only for editors and owner) */}
           {!isViewer && (
