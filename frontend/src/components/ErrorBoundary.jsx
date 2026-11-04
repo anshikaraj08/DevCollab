@@ -43,6 +43,12 @@ export default class ErrorBoundary extends React.Component {
                 An unexpected error occurred. You can reload the page or return to the home screen.
               </p>
             </div>
+            {this.state.error && (
+              <pre className="text-[11px] text-danger bg-danger/10 p-3 rounded-xl overflow-auto text-left max-h-48 font-mono break-all whitespace-pre-wrap">
+                {String(this.state.error?.message || this.state.error)}
+                {this.state.error?.stack && `\n\n${this.state.error.stack}`}
+              </pre>
+            )}
             <div className="flex items-center justify-center gap-3 pt-2">
               <Button type="button" variant="secondary" size="sm" onClick={this.handleReset}>
                 Go to Home

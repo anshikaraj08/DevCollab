@@ -398,7 +398,7 @@ export default function ShareDialog({ open, onClose, roomId, isOwner, currentUse
         onClose={() => setRemoveTarget(null)}
         onConfirm={handleConfirmRemoveMember}
         title="Remove Member?"
-        message={`Are you sure you want to remove ${removeTarget?.user.name} from this workspace? They will lose access immediately.`}
+        message={`Are you sure you want to remove ${removeTarget?.user?.name || "this member"} from this workspace? They will lose access immediately.`}
         confirmText="Remove"
         loading={actionLoading}
         variant="danger"

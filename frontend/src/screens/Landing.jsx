@@ -110,7 +110,8 @@ const FEATURES = [
 ];
 
 export default function Landing() {
-  const { user } = useContext(UserContext);
+  const userContext = useContext(UserContext);
+  const user = userContext?.user;
   const [selectedLang, setSelectedLang] = useState("cpp");
   const [terminalOutput, setTerminalOutput] = useState(CODE_SAMPLES.cpp.expectedOutput);
   const [isRunning, setIsRunning] = useState(false);
