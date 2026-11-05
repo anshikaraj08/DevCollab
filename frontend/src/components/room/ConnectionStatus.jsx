@@ -14,10 +14,10 @@ export default function ConnectionStatus({ status, lastSavedAt }) {
     ? new Date(lastSavedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
     : null;
   return (
-    <div role="status" className="flex items-center gap-2 text-xs text-muted">
+    <div role="status" className="flex items-center gap-1.5 text-xs text-muted shrink-0" title={`Connection status: ${state.label}`}>
       <span className={cn("size-2 rounded-full", state.dot)} />
-      <span>{state.label}</span>
-      {savedTime && status === "synced" && <span className="hidden text-faint lg:inline">Saved {savedTime}</span>}
+      <span className="hidden md:inline">{state.label}</span>
+      {savedTime && status === "synced" && <span className="hidden text-faint xl:inline">Saved {savedTime}</span>}
     </div>
   );
 }

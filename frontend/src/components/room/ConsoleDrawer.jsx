@@ -198,7 +198,7 @@ export default function ConsoleDrawer({
 
   return (
     <div
-      className="flex flex-col w-96 shrink-0 rounded-2xl border border-line bg-surface shadow-xl overflow-hidden select-none"
+      className="flex flex-col w-full sm:w-96 max-w-full shrink-0 rounded-2xl border border-line bg-surface shadow-xl overflow-hidden select-none max-md:absolute max-md:inset-y-0 max-md:right-0 max-md:z-20"
       role="region"
       aria-label="Console Drawer"
     >

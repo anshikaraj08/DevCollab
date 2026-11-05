@@ -422,49 +422,53 @@ export default function Room() {
   return (
     <div className="flex flex-col h-screen bg-canvas transition-colors">
       {/* ── Persistent Dark Header Bar ── */}
-      <header className="sticky top-0 z-30 flex items-center justify-between px-6 sm:px-10 h-[76px] shrink-0 border-b border-[#1e293b] bg-[#0f172a] text-white shadow-md transition-colors">
+      <header className="sticky top-0 z-30 flex items-center justify-between px-3 sm:px-6 md:px-8 h-14 sm:h-16 md:h-[72px] shrink-0 border-b border-[#1e293b] bg-[#0f172a] text-white shadow-md transition-colors gap-2 overflow-x-auto scrollbar-none">
 
         {/* Left: Brand Logo + Persistent Nav Buttons */}
-        <div className="flex items-center gap-3 min-w-0">
-          <Link to="/dashboard" title="DevCollab" className="flex items-center group shrink-0 mr-1">
-            <Logo size="md" />
+        <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 min-w-0 shrink-0">
+          <Link to="/dashboard" title="DevCollab" className="flex items-center group shrink-0">
+            <Logo size="md" hideTextOnMobile />
           </Link>
 
-          <span className="h-5 w-px bg-white/20 shrink-0" />
+          <span className="hidden sm:inline-block h-5 w-px bg-white/20 shrink-0" />
 
-          {/* Home Pill */}
+          {/* Home Pill (shown on larger screens) */}
           <Link
             to="/"
             title="Home"
-            className="flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border border-white/10 transition cursor-pointer select-none shrink-0"
+            aria-label="Home"
+            className="hidden lg:flex items-center gap-1.5 h-8 sm:h-9 px-3 rounded-full text-xs font-semibold bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border border-white/10 transition cursor-pointer select-none shrink-0"
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
             </svg>
-            <span className="hidden sm:inline">Home</span>
+            <span>Home</span>
           </Link>
 
           {/* Dashboard Pill */}
           <Link
             to="/dashboard"
             title="Workspaces Dashboard"
-            className="flex items-center gap-2 h-9 px-4 rounded-full text-xs font-semibold bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border border-white/10 transition cursor-pointer select-none shrink-0"
+            aria-label="Workspaces Dashboard"
+            className="flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-xs font-semibold bg-white/[0.08] hover:bg-white/[0.14] text-slate-300 hover:text-white border border-white/10 transition cursor-pointer select-none shrink-0"
           >
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4zm8-8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V4zm0 8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" clipRule="evenodd" />
             </svg>
-            <span className="hidden sm:inline">Dashboard</span>
+            <span className="hidden xl:inline">Dashboard</span>
           </Link>
 
-          {/* Divider + Room title metadata */}
-          <span className="hidden md:inline-block h-5 w-px bg-white/20 shrink-0 mx-0.5" />
-          <h1 className="font-bold text-white truncate text-xs sm:text-sm">{room.title}</h1>
-          <LanguageBadge language={room.language} />
+          {/* Divider + Room title metadata (hidden on small screens to save space) */}
+          <span className="hidden xl:inline-block h-5 w-px bg-white/20 shrink-0 mx-0.5" />
+          <h1 className="font-bold text-white truncate text-xs sm:text-sm hidden xl:inline max-w-[150px]">{room.title}</h1>
+          <div className="hidden lg:block shrink-0"><LanguageBadge language={room.language} /></div>
         </div>
 
         {/* Right: Presence + Status + ViewOnly + Share/People + Actions */}
-        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          {presence.length > 0 && <PresenceBar people={presence} />}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="hidden md:flex items-center">
+            {presence.length > 0 && <PresenceBar people={presence} />}
+          </div>
 
           <ConnectionStatus
             status={collab?.status ?? "connecting"}
@@ -473,9 +477,9 @@ export default function Room() {
 
           {/* View only indicator for viewers */}
           {isViewer && (
-            <span className="flex items-center gap-1.5 h-8 px-2.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[11px] font-bold select-none">
+            <span className="flex items-center gap-1 h-7 sm:h-8 px-2 sm:px-2.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[10px] sm:text-[11px] font-bold select-none shrink-0">
               <span className="size-1.5 rounded-full bg-sky-400" />
-              View only
+              <span className="hidden sm:inline">View only</span>
             </span>
           )}
 
@@ -485,21 +489,21 @@ export default function Room() {
             onClick={() => setShareOpen(true)}
             aria-label={isOwner ? "Share room" : "View workspace members"}
             title={isOwner ? "Share and invite collaborators" : "View workspace members"}
-            className="flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border border-white/10 text-slate-300 hover:text-white bg-white/[0.08] hover:bg-white/[0.14] transition cursor-pointer select-none"
+            className="flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-xs font-semibold border border-white/10 text-slate-300 hover:text-white bg-white/[0.08] hover:bg-white/[0.14] transition cursor-pointer select-none shrink-0"
           >
             {isOwner ? (
               <>
                 <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
                 </svg>
-                <span className="hidden sm:inline">Share</span>
+                <span className="hidden md:inline">Share</span>
               </>
             ) : (
               <>
                 <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                 </svg>
-                <span className="hidden sm:inline">People</span>
+                <span className="hidden md:inline">People</span>
               </>
             )}
           </button>
@@ -517,7 +521,7 @@ export default function Room() {
             }}
             aria-label="Code comments"
             title="Code comments"
-            className={`flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
+            className={`flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-xs font-semibold border transition cursor-pointer select-none shrink-0 ${
               sidePanelOpen && activeSideTab === "comments"
                 ? "bg-white text-slate-900 border-white shadow-sm font-bold"
                 : "border-white/10 text-slate-300 hover:text-white bg-white/[0.08] hover:bg-white/[0.14]"
@@ -526,8 +530,8 @@ export default function Room() {
             <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
             </svg>
-            <span className="hidden sm:inline">Comments</span>
-            {openComments > 0 && <span className="text-[11px] font-bold">{openComments}</span>}
+            <span className="hidden md:inline">Comments</span>
+            {openComments > 0 && <span className="text-[10px] sm:text-[11px] font-bold">{openComments}</span>}
           </button>
 
           {/* Snapshots / History */}
@@ -543,7 +547,7 @@ export default function Room() {
             }}
             aria-label="Version history"
             title="Version history"
-            className={`flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
+            className={`flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-xs font-semibold border transition cursor-pointer select-none shrink-0 ${
               sidePanelOpen && activeSideTab === "history"
                 ? "bg-white text-slate-900 border-white shadow-sm font-bold"
                 : "border-white/10 text-slate-300 hover:text-white bg-white/[0.08] hover:bg-white/[0.14]"
@@ -560,16 +564,16 @@ export default function Room() {
 
           {/* Undo and Redo (hidden for viewers, disabled when stack empty) */}
           {!isViewer && (
-            <div className="flex items-center rounded-full border border-white/10 bg-white/[0.08] p-0.5" role="group" aria-label="Undo and redo">
+            <div className="flex items-center rounded-full border border-white/10 bg-white/[0.08] p-0.5 shrink-0" role="group" aria-label="Undo and redo">
               <button
                 type="button"
                 onClick={() => collab?.undo()}
                 disabled={!canUndo || !canEdit}
                 title="Undo (Ctrl+Z)"
-                className="size-8 rounded-full flex items-center justify-center text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition cursor-pointer select-none"
+                className="size-7 sm:size-8 rounded-full flex items-center justify-center text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition cursor-pointer select-none"
                 aria-label="Undo"
               >
-                <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="size-3 sm:size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7v6h6" />
                   <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13" />
                 </svg>
@@ -579,10 +583,10 @@ export default function Room() {
                 onClick={() => collab?.redo()}
                 disabled={!canRedo || !canEdit}
                 title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
-                className="size-8 rounded-full flex items-center justify-center text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition cursor-pointer select-none"
+                className="size-7 sm:size-8 rounded-full flex items-center justify-center text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition cursor-pointer select-none"
                 aria-label="Redo"
               >
-                <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="size-3 sm:size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 7v6h-6" />
                   <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7" />
                 </svg>
@@ -598,24 +602,24 @@ export default function Room() {
               disabled={saving}
               aria-label="Save code"
               title="Save (Ctrl+S)"
-              className="flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full text-xs font-semibold bg-white/[0.08] hover:bg-white/[0.14] border border-white/10 text-white active:scale-95 transition cursor-pointer select-none disabled:opacity-50"
+              className="flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-xs font-semibold bg-white/[0.08] hover:bg-white/[0.14] border border-white/10 text-white active:scale-95 transition cursor-pointer select-none disabled:opacity-50 shrink-0"
             >
               {savedFeedback ? (
                 <>
                   <svg className="size-3 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-emerald-400 font-bold">Saved</span>
+                  <span className="text-emerald-400 font-bold hidden sm:inline">Saved</span>
                 </>
               ) : saving ? (
-                <span>Saving…</span>
+                <span className="hidden sm:inline">Saving…</span>
               ) : (
                 <>
                   <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6a1 1 0 10-2 0v5.586l-1.293-1.293z" />
                     <path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm2 1v8h10V6H5z" />
                   </svg>
-                  <span>Save</span>
+                  <span className="hidden sm:inline">Save</span>
                 </>
               )}
             </button>
@@ -627,7 +631,7 @@ export default function Room() {
             onClick={() => setPanelOpen((v) => !v)}
             aria-label="Toggle console and tests"
             title="Toggle Console & Tests"
-            className={`flex items-center gap-1.5 h-9 px-3 sm:px-3.5 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
+            className={`flex items-center gap-1.5 h-8 sm:h-9 px-2 sm:px-3 rounded-full text-xs font-semibold border transition cursor-pointer select-none shrink-0 ${
               panelOpen
                 ? "bg-white/20 border-white/30 text-white"
                 : "bg-white/[0.08] hover:bg-white/[0.14] border-white/10 text-white"
@@ -647,14 +651,14 @@ export default function Room() {
             disabled={running}
             aria-label="Run code"
             title="Run code"
-            className="flex items-center gap-1.5 h-9 px-4 sm:px-5 rounded-full text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 active:scale-95 transition disabled:opacity-50 cursor-pointer shadow-sm select-none"
+            className="flex items-center gap-1.5 h-8 sm:h-9 px-3 sm:px-4 rounded-full text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 active:scale-95 transition disabled:opacity-50 cursor-pointer shadow-sm select-none shrink-0"
           >
             {running ? (
               <>
                 <svg className="animate-spin size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                 </svg>
-                <span>Running…</span>
+                <span className="hidden sm:inline">Running…</span>
               </>
             ) : (
               <>
@@ -670,17 +674,17 @@ export default function Room() {
 
           {/* User Avatar */}
           {user && (
-            <div className="hidden sm:flex items-center">
+            <div className="hidden sm:flex items-center shrink-0">
               <Avatar name={user.name} size="sm" />
             </div>
           )}
 
-          <ThemeToggle />
+          <div className="shrink-0"><ThemeToggle /></div>
         </div>
       </header>
 
       {/* ── Main area ───────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 mx-4 my-3 gap-3">
+      <div className="flex flex-1 min-h-0 mx-2 sm:mx-4 my-2 sm:my-3 gap-2 sm:gap-3 relative overflow-hidden">
 
         {/* Editor frame */}
         <div className="flex flex-col flex-1 min-w-0 rounded-2xl overflow-hidden border border-line shadow-lg bg-surface relative">
@@ -738,7 +742,7 @@ export default function Room() {
 
         {/* Tabbed Side panel (Comments & History) */}
         {sidePanelOpen && (
-          <div className="flex flex-col w-80 shrink-0 rounded-2xl overflow-hidden border border-line bg-surface shadow-xl">
+          <div className="flex flex-col w-full sm:w-80 max-w-full shrink-0 rounded-2xl overflow-hidden border border-line bg-surface shadow-xl max-md:absolute max-md:inset-y-0 max-md:right-0 max-md:z-20">
             {/* Header with Tabs */}
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-line bg-surface-2 shrink-0">
               <div className="flex items-center gap-1">

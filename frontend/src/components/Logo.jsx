@@ -3,7 +3,7 @@
  * Vibrant, modern SaaS developer mark:
  * Luminous Emerald-to-Teal gradient with crisp white collaborative code chevrons.
  */
-export default function Logo({ size = "md", showText = true }) {
+export default function Logo({ size = "md", showText = true, hideTextOnMobile = false }) {
   const dims = {
     sm: { wrap: 30, text: "text-sm", gap: "gap-2.5" },
     md: { wrap: 36, text: "text-[15px] sm:text-base", gap: "gap-3" },
@@ -69,7 +69,11 @@ export default function Logo({ size = "md", showText = true }) {
 
       {/* ── Brand Typography: DevCollab ── */}
       {showText && (
-        <span className={`${dims.text} tracking-tight leading-none flex items-baseline select-none`}>
+        <span
+          className={`${dims.text} tracking-tight leading-none ${
+            hideTextOnMobile ? "hidden sm:flex" : "flex"
+          } items-baseline select-none`}
+        >
           <span className="font-black text-white">Dev</span>
           <span className="font-black text-emerald-400 ml-[1.5px]">Collab</span>
         </span>
