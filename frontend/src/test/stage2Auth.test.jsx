@@ -154,7 +154,10 @@ describe("Stage 2: Frontend Auth, OAuth & Settings", () => {
     };
 
     it("renders profile, verified badge, linked providers, and logout everywhere", async () => {
-      api.get.mockResolvedValueOnce({ data: { user: mockUser } });
+      api.get.mockImplementation((url) => {
+        if (url === "/users/me") return Promise.resolve({ data: { user: mockUser } });
+        return Promise.resolve({ data: { count: 0, notifications: [] } });
+      });
 
       renderWithProviders(<Settings />, { user: mockUser });
 
@@ -168,7 +171,10 @@ describe("Stage 2: Frontend Auth, OAuth & Settings", () => {
     });
 
     it("allows unlinking provider and triggers DELETE /users/me/providers/:provider", async () => {
-      api.get.mockResolvedValueOnce({ data: { user: mockUser } });
+      api.get.mockImplementation((url) => {
+        if (url === "/users/me") return Promise.resolve({ data: { user: mockUser } });
+        return Promise.resolve({ data: { count: 0, notifications: [] } });
+      });
       api.delete.mockResolvedValueOnce({
         data: { user: { ...mockUser, providers: [] }, message: "google unlinked" },
       });

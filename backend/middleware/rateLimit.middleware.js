@@ -90,3 +90,17 @@ export const aiRoomReviewLimiter = createRateLimiter({
   message: "This room has reached the daily limit of 20 AI code reviews.",
   keyType: "room-ai",
 });
+
+export const commentEditLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30,
+  message: "Too many comment edits. Limit is 30 per minute.",
+  keyType: "user",
+});
+
+export const notificationsLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,
+  message: "Too many notification requests. Please slow down.",
+  keyType: "user",
+});

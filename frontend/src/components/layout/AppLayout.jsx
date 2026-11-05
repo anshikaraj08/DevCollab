@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import Logo from "../Logo";
 import ThemeToggle from "../ThemeToggle";
 import Avatar from "../ui/Avatar";
+import NotificationBell from "../notifications/NotificationBell";
 import { UserContext } from "../../context/user.context";
 import { useLogout } from "../../hooks/useLogout";
 import { useToast } from "../ui/Toast";
@@ -133,6 +134,8 @@ export default function AppLayout({ children }) {
                 <span className="text-sm font-semibold text-white hidden md:inline">{user.name}</span>
               </div>
             )}
+
+            {user && <NotificationBell user={user} />}
 
             {user && (
               <Link

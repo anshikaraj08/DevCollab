@@ -17,6 +17,7 @@ const userSchema = new mongoose.Schema(
     tokenVersion: { type: Number, default: 0 },
     emailPrefs: {
       digest: { type: Boolean, default: false },
+      lastDigestAt: { type: Date, default: null },
     },
     avatarUrl: { type: String },
   },

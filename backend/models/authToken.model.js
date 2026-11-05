@@ -10,7 +10,7 @@ const authTokenSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["verify", "reset"],
+      enum: ["verify", "reset", "unsubscribe"],
       required: true,
     },
     tokenHash: {

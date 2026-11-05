@@ -14,6 +14,8 @@ DevCollab enforces role-based access control (RBAC) across three membership role
 | `room.read` | View workspace metadata, source code, and active presence | **Yes** | **Yes** | **Yes** |
 | `doc.edit` | Type in editor, send Yjs doc edits, save code | **Yes** | **Yes** | No |
 | `comment.write` | Post new comments or reply to comment threads | **Yes** | **Yes** | **Yes** |
+| `comment.edit` | Edit own comments and replies | **Own only** | **Own only** | **Own only** |
+| `comment.mention` | Mention workspace collaborators in comments and replies | **Yes** | **Yes** | **Yes** |
 | `comment.delete` | Delete comment (own for editor/viewer; any for owner) | **Yes** | **Yes** | **Yes** |
 | `run` | Execute code against Wandbox with live stdin/stdout | **Yes** | **Yes** | **Yes** |
 | `snapshot.read` | List snapshots and inspect snapshot code | **Yes** | **Yes** | **Yes** |

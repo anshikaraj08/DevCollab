@@ -5,6 +5,7 @@ import ApiError from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { MAX_ROOM_MEMBERS, DEFAULT_INVITE_HOURS, MAX_INVITE_HOURS, MIN_INVITE_HOURS, MAX_INVITE_USES } from "../config/limits.js";
 import { roomKey } from "../sockets/roomKey.js";
+import { notifyInviteAccepted } from "../services/notification.service.js";
 import { getRole } from "../utils/roles.js";
 import env from "../config/env.js";
 
@@ -188,9 +189,17 @@ export const acceptInvite = asyncHandler(async (req, res) => {
 
   const io = req.app.get("io");
   if (io) {
-    await io.syncRoomMembership(String(room._id));
+    await io.syncRoomMembership?.(String(room._id));
     io.to(roomKey(room._id)).emit("room:members", { roomId: room._id });
   }
+
+  // Notify inviter when invite is accepted
+  await notifyInviteAccepted({
+    inviterId: invite.createdBy,
+    acceptingUserId: userId,
+    roomId: room._id,
+    io,
+  }).catch(() => {});
 
   const roomObj = room.toObject ? room.toObject() : { ...room };
   roomObj.role = invite.role;

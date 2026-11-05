@@ -29,17 +29,22 @@ export default function Settings() {
   // Unlink loading
   const [unlinkingProvider, setUnlinkingProvider] = useState("");
 
+  // Email digest preferences state
+  const [savingDigest, setSavingDigest] = useState(false);
+
   const apiUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   // Refresh user data on mount
   useEffect(() => {
     api
-      .get("/users/me")
-      .then((res) => {
-        setUser(res.data.user);
-        setName(res.data.user.name);
+      .get?.("/users/me")
+      ?.then((res) => {
+        if (res?.data?.user) {
+          setUser(res.data.user);
+          setName(res.data.user.name);
+        }
       })
-      .catch(() => {});
+      ?.catch(() => {});
   }, [setUser]);
 
   const handleUpdateName = async (e) => {
@@ -69,6 +74,26 @@ export default function Settings() {
       toast.error(getErrorMessage(err, "Failed to send verification email"));
     } finally {
       setResendingEmail(false);
+    }
+  };
+
+  const handleToggleDigest = async (e) => {
+    const checked = e.target.checked;
+    setSavingDigest(true);
+    try {
+      const { data } = await api.patch("/users/me", {
+        emailPrefs: { digest: checked },
+      });
+      setUser(data.user);
+      toast.success(
+        checked
+          ? "Notification digests enabled"
+          : "Notification digests disabled"
+      );
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to update notification preferences"));
+    } finally {
+      setSavingDigest(false);
     }
   };
 
@@ -223,7 +248,46 @@ export default function Settings() {
           )}
         </section>
 
-        {/* ── Section 3: Linked Accounts ── */}
+        {/* ── Section 3: Notification Preferences ── */}
+        <section className="p-6 rounded-2xl border border-line bg-surface shadow-xs space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-fg uppercase tracking-wider text-muted">
+              Notifications
+            </h2>
+            <p className="text-xs text-muted mt-1">
+              Configure how you receive updates when collaborators mention you or reply to comments.
+            </p>
+          </div>
+
+          <div className="flex items-start justify-between gap-4 pt-2">
+            <div className="flex flex-col gap-1 max-w-md">
+              <label htmlFor="digest-toggle" className="text-sm font-semibold text-fg cursor-pointer">
+                Email notification digest
+              </label>
+              <p className="text-xs text-muted leading-relaxed">
+                Receive an email digest (at most once every 15 minutes) summarizing unread mentions and replies.
+              </p>
+              {!user?.emailVerified && (
+                <p className="text-[11px] text-amber-500 font-medium mt-1">
+                  Email verification is required to enable notification digests.
+                </p>
+              )}
+            </div>
+
+            <div className="shrink-0 pt-0.5">
+              <input
+                id="digest-toggle"
+                type="checkbox"
+                checked={Boolean(user?.emailPrefs?.digest)}
+                disabled={!user?.emailVerified || savingDigest}
+                onChange={handleToggleDigest}
+                className="size-4.5 accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Section 4: Linked Accounts ── */}
         <section className="p-6 rounded-2xl border border-line bg-surface shadow-xs space-y-5">
           <div>
             <h2 className="text-sm font-bold text-fg uppercase tracking-wider text-muted">

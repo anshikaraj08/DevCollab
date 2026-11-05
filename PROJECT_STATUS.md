@@ -133,6 +133,33 @@ DevCollab has completed **Phase 3** implementation as defined in `PHASE_3_PLAN.m
 | `POST` | `/rooms/:roomId/snapshots/:id/restore` | Editor (`snapshot.restore`) | Backup current & restore past version |
 | `DELETE` | `/rooms/:roomId/snapshots/:id` | Owner or Author (`snapshot.delete`) | Delete snapshot |
 
+### Comments & Threads (`/rooms/:roomId/comments` and `/comments`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/rooms/:roomId/comments` | Member (`room.read`) | List all room comments with mentions and replies |
+| `POST` | `/rooms/:roomId/comments` | Member (`comment.write`) | Add new comment with line, content, and mentions |
+| `PATCH` | `/rooms/:roomId/comments/:commentId` | Author (`comment.edit`, Rate-limited: 30/min) | Edit comment content and mentions (sets `editedAt`) |
+| `POST` | `/comments/:commentId/reply` | Member (`comment.write`) | Reply to comment thread with mentions |
+| `PATCH` | `/comments/:commentId/resolve` | Member (`comment.write`) | Mark comment resolved |
+| `PATCH` | `/comments/:commentId/unresolve` | Member (`comment.write`) | Reopen resolved comment |
+| `DELETE` | `/comments/:commentId` | Owner or Author (`comment.delete`) | Delete comment thread |
+
+### Notifications (`/notifications`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/notifications` | Authenticated (Rate-limited: 120/min) | List user notifications (supports `limit`, `before`, `unread`) |
+| `GET` | `/notifications/unread-count` | Authenticated | Get current unread notification count |
+| `POST` | `/notifications/read` | Authenticated | Mark notifications as read (`{ ids: [...] }` or `{ all: true }`) |
+| `GET`/`POST` | `/users/unsubscribe-digest` | Public (Token-authenticated) | One-click email digest unsubscribe link |
+
+### AI Code Review (`/rooms/:roomId/ai-review`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/rooms/:roomId/ai-review` | Editor/Owner (`ai.review`, Rate-limited: 5/hr user, 20/day room) | Request AI code review with focus |
+| `GET` | `/rooms/:roomId/ai-reviews` | Member (`ai.read`) | List previous AI reviews and findings |
+| `GET` | `/rooms/:roomId/ai-reviews/status` | Member (`ai.read`) | Check AI review configuration status |
+| `DELETE` | `/rooms/:roomId/ai-reviews/:reviewId` | Owner | Delete past AI code review |
+
 ### Test Cases (`/rooms/:roomId/tests`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
@@ -161,9 +188,11 @@ DevCollab has completed **Phase 3** implementation as defined in `PHASE_3_PLAN.m
 | `snapshots:changed` | Server → Client | `{ roomId }` | Refetches snapshot list |
 | `tests:updated` | Server → Client | `{ roomId, cases, by }` | Updates shared test cases in real time |
 | `comment:new` | Server → Client | `{ comment }` | Live comment posted |
+| `comment:updated` | Server → Client | `{ comment }` | Live comment edited (updates content & `editedAt`) |
 | `comment:resolved` | Server → Client | `{ commentId, resolved }` | Comment resolved status changed |
 | `comment:reply` | Server → Client | `{ comment }` | Reply added to comment |
 | `comment:deleted` | Server → Client | `{ commentId }` | Comment deleted |
+| `notification:new` | Server → Client (User channel `user:<id>`) | `{ notification }` | Live notification pushed to recipient |
 
 ---
 

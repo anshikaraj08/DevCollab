@@ -13,6 +13,7 @@ import {
   updateMe,
   updatePassword,
   unlinkProvider,
+  unsubscribeDigest,
   profile,
 } from "../controllers/user.controller.js";
 import { authUser } from "../middleware/auth.middleware.js";
@@ -38,6 +39,9 @@ router.post("/logout-all", authUser, logoutAll);
 // Email verification
 router.post("/verify-email/request", authUser, verifyEmailRequestLimiter, requestEmailVerification);
 router.post("/verify-email", verifyEmail);
+
+// Notification digest unsubscribe (one-click, public token)
+router.route("/unsubscribe-digest").get(unsubscribeDigest).post(unsubscribeDigest);
 
 // Password recovery
 router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);

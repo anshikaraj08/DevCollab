@@ -18,6 +18,16 @@ describe("Frontend Permission Matrix", () => {
     expect(can("editor", "comment.write")).toBe(true);
     expect(can("viewer", "comment.write")).toBe(true);
 
+    // comment.edit: yes, yes, yes
+    expect(can("owner", "comment.edit")).toBe(true);
+    expect(can("editor", "comment.edit")).toBe(true);
+    expect(can("viewer", "comment.edit")).toBe(true);
+
+    // comment.mention: yes, yes, yes
+    expect(can("owner", "comment.mention")).toBe(true);
+    expect(can("editor", "comment.mention")).toBe(true);
+    expect(can("viewer", "comment.mention")).toBe(true);
+
     // run: yes, yes, yes
     expect(can("owner", "run")).toBe(true);
     expect(can("editor", "run")).toBe(true);

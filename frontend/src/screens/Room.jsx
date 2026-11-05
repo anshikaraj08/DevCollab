@@ -57,6 +57,8 @@ export default function Room() {
 
   // Comments
   const [comments, setComments] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [activeThreadId, setActiveThreadId] = useState(null);
 
   // Snapshots & Diff View
   const [snapshots, setSnapshots] = useState([]);
@@ -119,6 +121,33 @@ export default function Room() {
       .catch(() => {});
   }, [roomId]);
 
+  // Load room members for mentions & presence
+  const loadMembers = useCallback(() => {
+    if (!roomId) return;
+    api.get(`/rooms/${roomId}/members`)
+      .then((res) => setMembers(res.data.members || []))
+      .catch(() => {});
+  }, [roomId]);
+
+  useEffect(() => {
+    loadMembers();
+  }, [loadMembers]);
+
+  // Handle deep link from notification: ?thread=<commentId>
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const threadParam = params.get("thread");
+    if (threadParam) {
+      setActiveSideTab("comments");
+      setSidePanelOpen(true);
+      setActiveThreadId(threadParam);
+
+      // Clean ?thread= from browser URL without triggering a page reload
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }, [roomId]);
+
   // Load snapshots list
   const loadSnapshots = useCallback(() => {
     if (!roomId) return;
@@ -170,6 +199,10 @@ export default function Room() {
     if (!collab?.socket) return;
     const socket = collab.socket;
     const onNew = ({ comment }) => setComments((prev) => [...prev, comment]);
+    const onUpdated = ({ comment }) =>
+      setComments((prev) =>
+        prev.map((c) => (String(c._id) === String(comment?._id) ? comment : c))
+      );
     const onResolved = ({ commentId, resolved }) =>
       setComments((prev) =>
         prev.map((c) => (String(c._id) === String(commentId) ? { ...c, resolved: resolved ?? true } : c))
@@ -195,6 +228,7 @@ export default function Room() {
     const onAiChanged = () => loadAiReviews();
 
     socket.on("comment:new", onNew);
+    socket.on("comment:updated", onUpdated);
     socket.on("comment:resolved", onResolved);
     socket.on("comment:reply", onReply);
     socket.on("comment:deleted", onDeleted);
@@ -205,6 +239,7 @@ export default function Room() {
 
     return () => {
       socket.off("comment:new", onNew);
+      socket.off("comment:updated", onUpdated);
       socket.off("comment:resolved", onResolved);
       socket.off("comment:reply", onReply);
       socket.off("comment:deleted", onDeleted);
@@ -465,16 +500,30 @@ export default function Room() {
   }, [activeAiReview, collab?.ytext]);
 
   // Comment handlers
-  const handleAddComment = async ({ line, text }) => {
-    const { data } = await api.post(`/comments/${roomId}`, { line, text });
+  const handleAddComment = async (lineOrObj, maybeText, maybeMentions) => {
+    let line, text, mentions = [];
+    if (typeof lineOrObj === "object" && lineOrObj !== null) {
+      line = lineOrObj.line;
+      text = lineOrObj.text || lineOrObj.content;
+      mentions = lineOrObj.mentions || [];
+    } else {
+      line = lineOrObj;
+      text = maybeText;
+      mentions = maybeMentions || [];
+    }
+    const { data } = await api.post(`/comments/${roomId}`, { line, text, mentions });
     setComments((prev) => (prev.some((c) => c._id === data.comment._id) ? prev : [...prev, data.comment]));
+  };
+  const handleEditComment = async (id, text, mentions = []) => {
+    const { data } = await api.patch(`/comments/${id}`, { text, mentions });
+    setComments((prev) => prev.map((c) => (c._id === id ? data.comment : c)));
   };
   const handleResolveComment = async (id) => {
     const { data } = await api.patch(`/comments/${id}/resolve`);
     setComments((prev) => prev.map((c) => (c._id === id ? data.comment : c)));
   };
-  const handleReplyComment = async (id, text) => {
-    const { data } = await api.post(`/comments/${id}/reply`, { text });
+  const handleReplyComment = async (id, text, mentions = []) => {
+    const { data } = await api.post(`/comments/${id}/reply`, { text, mentions });
     setComments((prev) => prev.map((c) => (c._id === id ? data.comment : c)));
   };
   const handleDeleteComment = async (id) => {
@@ -1009,10 +1058,14 @@ export default function Room() {
               {activeSideTab === "comments" ? (
                 <CommentPanel
                   comments={comments}
+                  members={members}
+                  currentUserId={user?._id || user?.id}
                   onAdd={handleAddComment}
+                  onEdit={handleEditComment}
                   onResolve={handleResolveComment}
                   onReply={handleReplyComment}
                   onDelete={handleDeleteComment}
+                  activeThreadId={activeThreadId}
                   isEmbedded
                 />
               ) : activeSideTab === "history" ? (

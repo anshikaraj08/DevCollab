@@ -21,6 +21,7 @@ import commentRoutes from "./routes/comment.routes.js";
 import snapshotRoutes from "./routes/snapshot.routes.js";
 import testCaseRoutes from "./routes/testCase.routes.js";
 import aiRoutes from "./routes/ai.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 import { notFound, errorHandler } from "./middleware/error.middleware.js";
 
 const app = express();
@@ -87,12 +88,14 @@ app.use("/rooms/:roomId/members", memberRoutes);
 app.use("/rooms/:roomId/invites", roomInviteRoutes);
 app.use("/rooms/:roomId/snapshots", snapshotRoutes);
 app.use("/rooms/:roomId/tests", testCaseRoutes);
+app.use("/rooms/:roomId/comments", commentRoutes);
 app.use("/rooms/:roomId/ai-reviews", aiRoutes);
 app.use("/rooms/:roomId/ai-review", aiRoutes);
 app.use("/rooms", roomRoutes);
 app.use("/invites", inviteRoutes);
 app.use("/run", runRoutes);
 app.use("/comments", commentRoutes);
+app.use("/notifications", notificationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

@@ -23,6 +23,8 @@ export const ACTIONS = [
   "room.delete",
   "ai.review",
   "ai.read",
+  "comment.edit",
+  "comment.mention",
 ];
 
 export const PERMISSION_MATRIX = {
@@ -31,6 +33,8 @@ export const PERMISSION_MATRIX = {
     "doc.edit",
     "comment.write",
     "comment.delete",
+    "comment.edit",
+    "comment.mention",
     "run",
     "snapshot.read",
     "snapshot.create",
@@ -50,6 +54,8 @@ export const PERMISSION_MATRIX = {
     "doc.edit",
     "comment.write",
     "comment.delete",
+    "comment.edit",
+    "comment.mention",
     "run",
     "snapshot.read",
     "snapshot.create",
@@ -65,6 +71,8 @@ export const PERMISSION_MATRIX = {
     "room.read",
     "comment.write",
     "comment.delete",
+    "comment.edit",
+    "comment.mention",
     "run",
     "snapshot.read",
     "tests.read",

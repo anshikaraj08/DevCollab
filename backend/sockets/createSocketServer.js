@@ -79,6 +79,9 @@ export function createSocketServer(httpServer, deps) {
     if (!userSockets) socketsByUserId.set(userId, (userSockets = new Set()));
     userSockets.add(socket.id);
 
+    // Join per-user notification channel
+    socket.join(`user:${userId}`);
+
     socket.data.rooms = new Set();
     socket.data.roles = {};
     socket.data.queue = Promise.resolve();

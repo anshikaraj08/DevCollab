@@ -332,22 +332,79 @@ export const getMe = asyncHandler(async (req, res) => {
 });
 
 /**
- * Update user display name
+ * Update user profile or email preferences
  * PATCH /users/me
  */
 export const updateMe = asyncHandler(async (req, res) => {
-  const { name } = req.body;
-  if (!name || name.trim().length < 2) {
-    throw new ApiError(400, "Name must be at least 2 characters");
+  const { name, emailPrefs } = req.body;
+
+  if (name === undefined && emailPrefs === undefined) {
+    throw new ApiError(400, "At least one field (name or emailPrefs) is required");
   }
 
   const user = await User.findById(req.user.id).select("+password");
   if (!user) throw new ApiError(404, "User not found");
 
-  user.name = name.trim();
+  if (name !== undefined) {
+    if (!name || name.trim().length < 2) {
+      throw new ApiError(400, "Name must be at least 2 characters");
+    }
+    user.name = name.trim();
+  }
+
+  if (emailPrefs && typeof emailPrefs === "object") {
+    if (typeof emailPrefs.digest === "boolean") {
+      if (emailPrefs.digest && !user.emailVerified) {
+        throw new ApiError(400, "Email must be verified before enabling email digests");
+      }
+      user.emailPrefs = user.emailPrefs || {};
+      user.emailPrefs.digest = emailPrefs.digest;
+    }
+  }
+
   await user.save();
 
   res.json({ user: publicUser(user), message: "Profile updated successfully" });
+});
+
+/**
+ * Unsubscribe from email digests with one-click token
+ * GET /users/unsubscribe-digest?token=... or POST /users/unsubscribe-digest
+ */
+export const unsubscribeDigest = asyncHandler(async (req, res) => {
+  const token = req.query.token || req.body.token;
+  if (!token || typeof token !== "string") {
+    throw new ApiError(400, "Unsubscribe token is required");
+  }
+
+  const computedHash = crypto.createHash("sha256").update(token).digest("hex");
+  const record = await AuthToken.findOne({
+    type: "unsubscribe",
+    tokenHash: computedHash,
+  });
+
+  if (!record || record.usedAt || record.expiresAt < new Date()) {
+    throw new ApiError(400, "Invalid, expired, or previously used unsubscribe link");
+  }
+
+  if (!crypto.timingSafeEqual(Buffer.from(record.tokenHash), Buffer.from(computedHash))) {
+    throw new ApiError(400, "Invalid unsubscribe token");
+  }
+
+  record.usedAt = new Date();
+  await record.save();
+
+  const user = await User.findById(record.user);
+  if (user) {
+    user.emailPrefs = user.emailPrefs || {};
+    user.emailPrefs.digest = false;
+    await user.save();
+  }
+
+  res.json({
+    message: "You have been successfully unsubscribed from notification digests.",
+    unsubscribed: true,
+  });
 });
 
 /**
