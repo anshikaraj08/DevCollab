@@ -31,6 +31,16 @@ export function ToastProvider({ children }) {
   toast.error = (msg) => addToast(msg, "error");
   toast.info = (msg) => addToast(msg, "info");
 
+  useEffect(() => {
+    const handleGlobalToast = (e) => {
+      if (e.detail?.message) {
+        addToast(e.detail.message, e.detail.type || "info");
+      }
+    };
+    window.addEventListener("toast:show", handleGlobalToast);
+    return () => window.removeEventListener("toast:show", handleGlobalToast);
+  }, [addToast]);
+
   return (
     <ToastContext.Provider value={toast}>
       {children}

@@ -23,3 +23,4 @@ router.get("/metrics", async (req, res) => {
 });
 
 export default router;
+

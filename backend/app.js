@@ -10,6 +10,7 @@ import ApiError from "./utils/ApiError.js";
 import healthRoutes from "./routes/health.routes.js";
 import metricsRoutes from "./routes/metrics.routes.js";
 import { initSentry } from "./config/sentry.js";
+import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import roomRoutes from "./routes/room.routes.js";
 import memberRoutes from "./routes/member.routes.js";
@@ -63,7 +64,9 @@ app.use(
 );
 
 app.use(express.json());
-app.use(cookieParser());
+const cookieSecret =
+  process.env.COOKIE_SECRET || process.env.JWT_ACCESS_SECRET || "devcollab-cookie-secret-key-32chars";
+app.use(cookieParser(cookieSecret));
 
 // Health & Readiness probes (unauthenticated)
 app.use(healthRoutes);
@@ -77,6 +80,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 app.get("/", (req, res) => res.json({ message: "DevCollab API running" }));
+app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/rooms/:roomId/members", memberRoutes);
 app.use("/rooms/:roomId/invites", roomInviteRoutes);

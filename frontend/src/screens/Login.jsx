@@ -4,6 +4,7 @@ import api, { setAccessToken } from "../config/axios";
 import getErrorMessage from "../config/getErrorMessage";
 import { UserContext } from "../context/user.context";
 import AuthLayout from "../components/layout/AuthLayout";
+import OAuthButtons from "../components/auth/OAuthButtons";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -52,6 +53,8 @@ export default function Login() {
         </>
       }
     >
+      <OAuthButtons next={getSafeNext()} />
+
       <form onSubmit={submit} className="space-y-4">
         {error && (
           <p
@@ -75,25 +78,35 @@ export default function Login() {
           />
         </div>
 
-        {/* Password Input with show/hide */}
-        <div className="relative">
-          <input
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full h-11 px-4 pr-11 rounded-xl border border-line bg-surface text-fg text-sm placeholder:text-muted focus:outline-none focus:border-fg transition"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg transition text-xs font-semibold cursor-pointer select-none"
-            aria-label={showPassword ? "Hide password" : "Show password"}
-          >
-            {showPassword ? "Hide" : "Show"}
-          </button>
+        {/* Password Input with show/hide and Forgot Password */}
+        <div>
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full h-11 px-4 pr-11 rounded-xl border border-line bg-surface text-fg text-sm placeholder:text-muted focus:outline-none focus:border-fg transition"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg transition text-xs font-semibold cursor-pointer select-none"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+          <div className="flex justify-end mt-1.5">
+            <Link
+              to="/forgot-password"
+              className="text-xs text-muted hover:text-fg font-medium transition"
+            >
+              Forgot password?
+            </Link>
+          </div>
         </div>
 
         {/* Sign In Button */}

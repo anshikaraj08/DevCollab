@@ -61,3 +61,4 @@ export function initSentry() {
 }
 
 export default { initSentry, scrubSentryEvent };
+

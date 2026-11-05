@@ -17,9 +17,11 @@ import Room from "../models/room.model.js";
 import Comment from "../models/comment.model.js";
 import Invite from "../models/invite.model.js";
 import Snapshot from "../models/snapshot.model.js";
+import AuthToken from "../models/authToken.model.js";
 
 const models = [
   { name: "User", model: User },
+  { name: "AuthToken", model: AuthToken },
   { name: "Room", model: Room },
   { name: "Comment", model: Comment },
   { name: "Invite", model: Invite },

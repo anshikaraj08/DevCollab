@@ -4,6 +4,7 @@ import api, { setAccessToken } from "../config/axios";
 import getErrorMessage from "../config/getErrorMessage";
 import { UserContext } from "../context/user.context";
 import AuthLayout from "../components/layout/AuthLayout";
+import OAuthButtons from "../components/auth/OAuthButtons";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -53,6 +54,8 @@ export default function Register() {
         </>
       }
     >
+      <OAuthButtons next={getSafeNext()} />
+
       <form onSubmit={submit} className="space-y-4">
         {error && (
           <p

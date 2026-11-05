@@ -4,32 +4,30 @@
 import { z } from "zod";
 // Imports Zod, a library used to define and validate data structures.
  
-export const registerSchema = z.object({
-  name: z
-  .string()
-  .trim()
-  .min(1,"Name is required")
-  .min(3, "Name must be at least 3 characters long")
-  .max(50, "Name cannot exceed 50 characters"),
-
- email: z
-  .string()
-  .trim()
-  .toLowerCase()
-  .min(1, "Email is required")
-  .max(254, "Email must not exceed 254 characters")
-  .email("Please enter a valid email address"),
-  password: z
+export const passwordSchema = z
   .string()
   .min(6, "Password must be at least 6 characters long")
   .max(128, "Password cannot exceed 128 characters")
   .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
   .regex(/[a-z]/, "Password must contain at least one lowercase letter")
   .regex(/[0-9]/, "Password must contain at least one number")
-  .regex(
-    /[^A-Za-z0-9]/,
-    "Password must contain at least one special character"
-  ),
+  .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character");
+
+export const registerSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(3, "Name must be at least 3 characters long")
+    .max(50, "Name cannot exceed 50 characters"),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1, "Email is required")
+    .max(254, "Email must not exceed 254 characters")
+    .email("Please enter a valid email address"),
+  password: passwordSchema,
 });
  
 export const loginSchema = z.object({

@@ -18,6 +18,15 @@ export const envSchema = z.object({
   TRUST_PROXY: z.union([z.string(), z.number()]).optional(),
   APP_VERSION: z.string().default("1.0.0"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).optional(),
+  API_URL: z.string().default("http://localhost:5000"),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  SMTP_URL: z.string().optional(),
+  MAIL_FROM: z.string().optional(),
+  MAIL_TRANSPORT: z.enum(["smtp", "console"]).default("console"),
+  COOKIE_SECRET: z.string().optional(),
 });
 
 /**

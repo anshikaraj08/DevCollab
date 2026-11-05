@@ -124,3 +124,4 @@ The script will assert:
 * **CORS Errors (`403 CORS origin denied`):** Ensure `CLIENT_URLS` in Render exactly matches the frontend URL (e.g. `https://your-project.vercel.app`, without trailing slashes).
 * **Login Fails on Refresh (Missing Cookies):** Verify `COOKIE_SAMESITE=none` is set in Render environment variables. Cross-site cookies between `.onrender.com` and `.vercel.app` require `SameSite=None; Secure`.
 * **Render Cold Start Delay:** When accessing after 15 minutes of inactivity, wait 30 seconds for the container to wake up. Check `https://<backend>.onrender.com/readyz` in your browser to confirm readiness.
+

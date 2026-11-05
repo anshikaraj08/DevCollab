@@ -35,6 +35,21 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         setAccessToken(null);
+        if (
+          typeof window !== "undefined" &&
+          !window.location.pathname.startsWith("/login") &&
+          !window.location.pathname.startsWith("/register") &&
+          !window.location.pathname.startsWith("/auth/callback")
+        ) {
+          window.dispatchEvent(
+            new CustomEvent("toast:show", {
+              detail: { message: "Your session ended. Please sign in again.", type: "info" },
+            })
+          );
+          window.location.href = `/login?next=${encodeURIComponent(
+            window.location.pathname + window.location.search
+          )}`;
+        }
       } finally {
         refreshing = null;
       }
