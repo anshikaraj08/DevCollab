@@ -133,7 +133,11 @@ export default function MarketingLayout() {
       <footer className="border-t border-line bg-surface/50">
         <PageContainer className="flex h-16 items-center justify-between text-xs text-faint">
           <span className="font-mono">&copy; {new Date().getFullYear()} DevCollab</span>
-          <span className="hidden font-mono sm:inline">Collaborative Code Review Platform</span>
+          <div className="flex items-center gap-4">
+            <Link to="/privacy" className="hover:text-fg transition">Privacy</Link>
+            <Link to="/terms" className="hover:text-fg transition">Terms</Link>
+            <span className="hidden font-mono sm:inline">Collaborative Code Review Platform</span>
+          </div>
         </PageContainer>
       </footer>
     </div>

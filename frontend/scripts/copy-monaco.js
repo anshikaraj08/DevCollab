@@ -47,3 +47,4 @@ try {
   console.error(`[copy-monaco] Failed to copy Monaco Editor assets:`, err);
   process.exit(1);
 }
+

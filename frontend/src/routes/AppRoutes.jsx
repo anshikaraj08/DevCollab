@@ -4,6 +4,8 @@ import AppLayout from "../components/layout/AppLayout";
 import MarketingLayout from "../components/layout/MarketingLayout";
 import Home from "../screens/Home";
 import Landing from "../screens/Landing";
+import Privacy from "../screens/Privacy";
+import Terms from "../screens/Terms";
 import Login from "../screens/Login";
 import Register from "../screens/Register";
 import Room from "../screens/Room";
@@ -16,6 +18,8 @@ export default function AppRoutes() {
         {/* public pages that share the marketing navigation and footer */}
         <Route element={<MarketingLayout />}>
           <Route path="/" element={<Landing />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
         </Route>
 
         <Route path="/login" element={<Login />} />

@@ -8,6 +8,8 @@ import env, { getAllowedOrigins } from "./config/env.js";
 import logger from "./utils/logger.js";
 import ApiError from "./utils/ApiError.js";
 import healthRoutes from "./routes/health.routes.js";
+import metricsRoutes from "./routes/metrics.routes.js";
+import { initSentry } from "./config/sentry.js";
 import userRoutes from "./routes/user.routes.js";
 import roomRoutes from "./routes/room.routes.js";
 import memberRoutes from "./routes/member.routes.js";
@@ -20,6 +22,9 @@ import testCaseRoutes from "./routes/testCase.routes.js";
 import { notFound, errorHandler } from "./middleware/error.middleware.js";
 
 const app = express();
+
+// Initialize Sentry error reporting if SENTRY_DSN is configured
+initSentry();
 
 // Reverse proxy configuration
 if (env?.TRUST_PROXY !== undefined && env?.TRUST_PROXY !== "") {
@@ -62,6 +67,14 @@ app.use(cookieParser());
 
 // Health & Readiness probes (unauthenticated)
 app.use(healthRoutes);
+app.use(metricsRoutes);
+
+// Debug Sentry endpoint (only available outside production)
+if (process.env.NODE_ENV !== "production") {
+  app.get("/debug-sentry", () => {
+    throw new Error("DevCollab test error for Sentry verification");
+  });
+}
 
 app.get("/", (req, res) => res.json({ message: "DevCollab API running" }));
 app.use("/users", userRoutes);

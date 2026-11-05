@@ -49,3 +49,4 @@ ensureIndexes().catch((err) => {
   logger.error({ err }, "Fatal error during ensureIndexes");
   process.exit(1);
 });
+
