@@ -54,3 +54,4 @@ describe("Landing Structure and Modal Accessibility", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
+

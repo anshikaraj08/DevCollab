@@ -179,3 +179,45 @@ DevCollab has completed **Phase 3** implementation as defined in `PHASE_3_PLAN.m
 - [x] RBAC permission matrix documented in `docs/PERMISSIONS.md`.
 - [x] No `console.log` statements in committed backend or frontend source code.
 - [x] Accessibility focus traps, aria labels, and keyboard shortcuts verified.
+
+---
+
+## 6. Phase 4 Backlog (Future Roadmap)
+
+1. **Production Deployment & Containerization:**
+   - Dockerfile and multi-stage container builds for backend and frontend.
+   - Reverse proxy configuration (Nginx / Caddy) with `app.set("trust proxy", 1)`.
+   - Production domain SSL/TLS termination and production cookie configurations (`sameSite: "none"`, `secure: true`).
+2. **Horizontal Scaling & Multi-Server Sockets:**
+   - Redis Pub/Sub adapter (`@socket.io/redis-adapter`) for multi-instance socket synchronization.
+   - Distributed Yjs doc store persistence leveraging Redis / MongoDB changes streams.
+3. **OAuth & Social Authentication:**
+   - GitHub and Google single-sign-on (SSO) integration via Passport.js or Auth0.
+   - Account linking and organization-level user directories.
+4. **AI-Powered Code Review:**
+   - LLM-assisted line reviews and refactoring suggestions integrated into the CommentPanel.
+   - Automated test case generation based on function signatures and language AST.
+5. **Enhanced Comment Capabilities:**
+   - Rich Markdown and code snippet rendering inside comment threads.
+   - In-place comment text editing and edit history audit log.
+6. **Notification System:**
+   - In-app notification center and email alerts (SendGrid / Resend) for replies, mentions, and workspace role changes.
+
+---
+
+## 7. Manual QA Verification Guide
+
+A 12-point manual QA script using 3 browser profiles (Owner, Editor, Viewer):
+
+1. **Invite & Join Flow:** Owner creates workspace and generates an Editor invite. Editor opens `/invite/:token`, logs in, accepts, and enters the room.
+2. **Viewer Restrictions:** Owner generates a Viewer invite. Viewer joins: typing is blocked, but commenting and pressing Run works.
+3. **Multiplayer Typing & Presence:** All 3 participants see each other's avatars in the presence bar and live Monaco cursors.
+4. **Dynamic Role Transitions:** Owner updates Viewer to Editor via ShareDialog People tab. The collaborator can now edit code immediately without a page refresh.
+5. **Live Removal:** Owner removes a member. The removed user's screen immediately transitions to the access revoked state.
+6. **Security & Secrecy:** Non-members attempting to access `/room/:roomId` receive a 404 (preventing room existence leaking).
+7. **Version Restore & Diff:** Editor saves a version, alters code, opens DiffView to compare against Current, and restores past version. A pre-restore backup is auto-saved.
+8. **Isolated Undo:** Owner and Editor type concurrently. Pressing Ctrl+Z only undoes the local user's keystrokes.
+9. **Runner & Test Cases:** Run code with stdin; add test cases, run all sequentially, and view pass/fail diffs.
+10. **Rate Limiting:** Repeated failed login attempts (11+) from an IP return 429 Too Many Requests with a `Retry-After` header.
+11. **Persistence Resilience:** Restarting the backend node process preserves all Yjs doc states and snapshots.
+12. **Responsive Design & Themes:** Test light and dark themes on both desktop and mobile viewports.

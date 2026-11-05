@@ -15,3 +15,4 @@ router.get("/", roomAccess("tests.read"), getTestCases);
 router.put("/", roomAccess("tests.write"), validate(updateTestsSchema), updateTestCases);
 
 export default router;
+

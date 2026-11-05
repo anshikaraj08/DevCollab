@@ -36,3 +36,4 @@ In addition to HTTP middleware (`roomAccess`), the Socket.IO and Yjs collaborati
 2. **Dynamic role transitions:** When an owner modifies a user's role or removes them via `PATCH /rooms/:roomId/members/:userId` or `DELETE /rooms/:roomId/members/:userId`, `io.syncRoomMembership(roomId)` pushes `room:role` or `room:removed` to live sockets immediately without requiring a browser reload.
 3. **Collaborative Undo Isolation:** `Y.UndoManager` scopes undo/redo exclusively to the local editor's origin. Viewers do not have undo stacks. When a snapshot restore occurs (`room:restored`), undo history is cleared across all participants to prevent re-inserting pre-restore contents.
 4. **Concurrent Connection Limits:** Each authenticated user is limited to 10 concurrent real-time sockets across rooms. Excess connections are rejected with `TOO_MANY`.
+
