@@ -3,6 +3,7 @@ import Room from "../models/room.model.js";
 import User from "../models/user.model.js";
 import logger from "../utils/logger.js";
 import { getRole } from "../utils/roles.js";
+import { getAllowedOrigins } from "../config/env.js";
 import { DocStore } from "./docStore.js";
 import { createSocketServer } from "./createSocketServer.js";
 
@@ -18,10 +19,12 @@ export function initSockets(httpServer) {
       Room.updateOne({ _id: roomId }, { $set: { code, yState } }),
   });
 
+  const allowedOrigins = getAllowedOrigins(process.env);
+
   const io = createSocketServer(httpServer, {
     store,
     logger,
-    corsOrigin: process.env.CLIENT_URL,
+    corsOrigin: allowedOrigins,
     verifyToken: (token) => jwt.verify(token, process.env.JWT_ACCESS_SECRET),
     getUser: async (id) => {
       const user = await User.findById(id).select("name");

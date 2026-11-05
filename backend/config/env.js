@@ -12,7 +12,25 @@ export const envSchema = z.object({
     .string({ required_error: "JWT_REFRESH_SECRET is required" })
     .min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
   CLIENT_URL: z.string().default("http://localhost:5173"),
+  CLIENT_URLS: z.string().optional(),
+  COOKIE_DOMAIN: z.string().optional(),
+  COOKIE_SAMESITE: z.enum(["lax", "none", "strict"]).optional(),
+  TRUST_PROXY: z.union([z.string(), z.number()]).optional(),
+  APP_VERSION: z.string().default("1.0.0"),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).optional(),
 });
+
+/**
+ * Returns an array of sanitized allowed client origins.
+ * Supports comma-separated CLIENT_URLS, falling back to CLIENT_URL.
+ */
+export function getAllowedOrigins(raw = process.env) {
+  const source = raw.CLIENT_URLS || raw.CLIENT_URL || "http://localhost:5173";
+  return source
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+}
 
 export function validateEnv(raw = process.env) {
   const merged = {
@@ -42,6 +60,9 @@ try {
   process.env.JWT_SECRET = env.JWT_ACCESS_SECRET;
   process.env.JWT_REFRESH_SECRET = env.JWT_REFRESH_SECRET;
   process.env.CLIENT_URL = env.CLIENT_URL;
+  if (env.CLIENT_URLS) process.env.CLIENT_URLS = env.CLIENT_URLS;
+  if (env.TRUST_PROXY !== undefined) process.env.TRUST_PROXY = String(env.TRUST_PROXY);
+  process.env.APP_VERSION = env.APP_VERSION;
 } catch (err) {
   if (process.env.NODE_ENV !== "test") {
     console.error(err.message);
@@ -51,4 +72,3 @@ try {
 
 export { env };
 export default env;
-

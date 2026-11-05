@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master, phase-3]
+    branches: [main, master, phase-3, phase-4]
   pull_request:
-    branches: [main, master, phase-3]
+    branches: [main, master, phase-3, phase-4]
 
 jobs:
   test-and-build:
@@ -24,6 +24,7 @@ jobs:
       JWT_ACCESS_SECRET: test-secret-at-least-32-characters-long-key
       JWT_REFRESH_SECRET: test-refresh-secret-at-least-32-characters-long
       CLIENT_URL: http://localhost:5173
+      CLIENT_URLS: http://localhost:5173
 
     steps:
       - name: Checkout repository
@@ -37,6 +38,9 @@ jobs:
           cache-dependency-path: |
             backend/package.json
             frontend/package.json
+
+      - name: Verify environment documentation
+        run: node scripts/check-env-example.js
 
       - name: Install backend dependencies
         run: npm --prefix backend install

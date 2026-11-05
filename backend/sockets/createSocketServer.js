@@ -15,8 +15,32 @@ const toBytes = (x) => (x instanceof Uint8Array ? x : x instanceof ArrayBuffer ?
 export function createSocketServer(httpServer, deps) {
   const { store, corsOrigin, verifyToken, getUser, getRoomForMember, logger = console } = deps;
 
+  const allowedOrigins = Array.isArray(corsOrigin)
+    ? corsOrigin
+    : typeof corsOrigin === "string"
+    ? [corsOrigin]
+    : corsOrigin;
+
+  const corsConfig =
+    typeof corsOrigin === "function"
+      ? { origin: corsOrigin, credentials: true }
+      : {
+          origin: (origin, callback) => {
+            if (!origin) return callback(null, true);
+            const normalized = origin.trim().replace(/\/+$/, "");
+            const list = (Array.isArray(allowedOrigins) ? allowedOrigins : [allowedOrigins]).map((o) =>
+              typeof o === "string" ? o.trim().replace(/\/+$/, "") : o
+            );
+            if (list.includes(normalized)) {
+              return callback(null, true);
+            }
+            return callback(new Error("CORS origin denied"), false);
+          },
+          credentials: true,
+        };
+
   const io = new Server(httpServer, {
-    cors: { origin: corsOrigin, credentials: true },
+    cors: corsConfig,
     maxHttpBufferSize: 1e6,
   });
   const awarenessByRoom = new Map(); // roomId -> Map(socketId -> { clientId, update })
