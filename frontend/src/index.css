@@ -17,6 +17,7 @@
   --primary-fg: #ffffff;
   --danger: #dc2626;
   --success: #16a34a;
+  --ai: #8b5cf6;
 }
  
 .dark {
@@ -32,6 +33,7 @@
   --primary-fg: #111111;
   --danger: #f87171;
   --success: #4ade80;
+  --ai: #a78bfa;
 }
  
 /* Tailwind turns these into classes: bg-canvas, bg-surface, text-fg, text-muted,
@@ -49,6 +51,7 @@
   --color-primary-fg: var(--primary-fg);
   --color-danger: var(--danger);
   --color-success: var(--success);
+  --color-ai: var(--ai);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
  
@@ -96,3 +99,15 @@
   background: #f59e0b;
 }
 .comment-glyph-resolved::before { background: var(--faint); }
+
+/* ---------- 4. AI Review markers inside the editor ---------- */
+.ai-line { background-color: color-mix(in srgb, var(--ai) 12%, transparent); }
+.ai-glyph::before {
+  content: "";
+  display: block;
+  width: 9px;
+  height: 9px;
+  margin: 5px 0 0 5px;
+  border-radius: 50%;
+  background: var(--ai);
+}

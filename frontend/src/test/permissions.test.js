@@ -41,5 +41,15 @@ describe("Frontend Permission Matrix", () => {
     expect(can("owner", "room.delete")).toBe(true);
     expect(can("editor", "room.delete")).toBe(false);
     expect(can("viewer", "room.delete")).toBe(false);
+
+    // ai.review: yes, yes, no
+    expect(can("owner", "ai.review")).toBe(true);
+    expect(can("editor", "ai.review")).toBe(true);
+    expect(can("viewer", "ai.review")).toBe(false);
+
+    // ai.read: yes, yes, yes
+    expect(can("owner", "ai.read")).toBe(true);
+    expect(can("editor", "ai.read")).toBe(true);
+    expect(can("viewer", "ai.read")).toBe(true);
   });
 });

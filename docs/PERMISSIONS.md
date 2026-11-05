@@ -26,6 +26,8 @@ DevCollab enforces role-based access control (RBAC) across three membership role
 | `members.manage` | Change collaborator roles or remove members | **Yes** | No | No |
 | `invites.manage` | Generate, list, and revoke invite links | **Yes** | No | No |
 | `room.delete` | Permanently delete the workspace and all history | **Yes** | No | No |
+| `ai.review` | Request an AI code review (consumes provider quota) | **Yes** | **Yes** | No |
+| `ai.read` | View AI code review history and findings | **Yes** | **Yes** | **Yes** |
 
 ---
 

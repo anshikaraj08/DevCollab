@@ -21,6 +21,8 @@ export const ACTIONS = [
   "members.manage",
   "invites.manage",
   "room.delete",
+  "ai.review",
+  "ai.read",
 ];
 
 export const PERMISSION_MATRIX = {
@@ -40,6 +42,8 @@ export const PERMISSION_MATRIX = {
     "members.manage",
     "invites.manage",
     "room.delete",
+    "ai.review",
+    "ai.read",
   ],
   editor: [
     "room.read",
@@ -54,6 +58,8 @@ export const PERMISSION_MATRIX = {
     "tests.read",
     "tests.write",
     "members.read",
+    "ai.review",
+    "ai.read",
   ],
   viewer: [
     "room.read",
@@ -63,6 +69,7 @@ export const PERMISSION_MATRIX = {
     "snapshot.read",
     "tests.read",
     "members.read",
+    "ai.read",
   ],
 };
 

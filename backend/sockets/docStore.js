@@ -36,6 +36,36 @@ export class DocStore {
     return saved?.code ?? "";
   }
 
+  /**
+   * Creates a Yjs relative position anchor for a given 1-based line number in the document.
+   * Enables AI review findings to move along with subsequent collaborative edits.
+   * @param {string} roomId
+   * @param {number} lineNumber
+   * @returns {Promise<any|null>}
+   */
+  async createAnchorForLine(roomId, lineNumber) {
+    const id = String(roomId);
+    let entry = this.entries.get(id);
+    let acquired = false;
+    if (!entry) {
+      entry = await this.acquire(id);
+      acquired = true;
+    }
+    try {
+      const text = entry.ytext.toString();
+      const offset = getLineStartOffset(text, lineNumber);
+      const relPos = Y.createRelativePositionFromTypeIndex(entry.ytext, offset);
+      return Y.relativePositionToJSON(relPos);
+    } catch (err) {
+      this.logger.error?.({ roomId: id, lineNumber, err: err.message }, "Failed to create line anchor");
+      return null;
+    } finally {
+      if (acquired) {
+        await this.release(id);
+      }
+    }
+  }
+
   /** Replace the room document's content with text in one transaction originating from "server". */
   async replaceText(roomId, text) {
     const id = String(roomId);
@@ -152,5 +182,22 @@ export class DocStore {
       entry.timer.unref?.();
     }
   }
+}
+
+/**
+ * Calculates 0-based character offset for start of a 1-based lineNumber.
+ */
+export function getLineStartOffset(text, lineNumber) {
+  if (!text || lineNumber <= 1) return 0;
+  let currentLine = 1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "\n") {
+      currentLine++;
+      if (currentLine === lineNumber) {
+        return i + 1;
+      }
+    }
+  }
+  return text.length;
 }
 

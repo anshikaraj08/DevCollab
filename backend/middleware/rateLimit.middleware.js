@@ -13,12 +13,19 @@ export function createRateLimiter({ windowMs, max, message, keyType = "ip" }) {
   return rateLimit({
     windowMs,
     max,
+    message,
     standardHeaders: "draft-7",
     legacyHeaders: false,
     validate: false,
     keyGenerator: (req) => {
       if (keyType === "user" && req.user?.id) {
         return `user:${req.user.id}`;
+      }
+      if (keyType === "user-ai" && req.user?.id) {
+        return `ai-user:${req.user.id}`;
+      }
+      if (keyType === "room-ai") {
+        return `ai-room:${req.params?.roomId || "unknown"}`;
       }
       const forwarded = req.headers["x-forwarded-for"];
       const clientIp = forwarded
@@ -68,4 +75,18 @@ export const oauthLimiter = createRateLimiter({
   max: 30,
   message: "Too many OAuth sign-in attempts. Please try again shortly.",
   keyType: "ip",
+});
+
+export const aiUserReviewLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: "Too many AI review requests. Limit is 5 per hour per user.",
+  keyType: "user-ai",
+});
+
+export const aiRoomReviewLimiter = createRateLimiter({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 20,
+  message: "This room has reached the daily limit of 20 AI code reviews.",
+  keyType: "room-ai",
 });

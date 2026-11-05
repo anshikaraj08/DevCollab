@@ -15,6 +15,7 @@ import PresenceBar from "../components/room/PresenceBar";
 import ConnectionStatus from "../components/room/ConnectionStatus";
 import CommentPanel from "../components/room/CommentPanel";
 import HistoryPanel from "../components/room/HistoryPanel";
+import AiReviewPanel from "../components/room/AiReviewPanel";
 import DiffView from "../components/room/DiffView";
 import ShareDialog from "../components/room/ShareDialog";
 import ConsoleDrawer from "../components/room/ConsoleDrawer";
@@ -22,6 +23,7 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { useToast } from "../components/ui/Toast";
 import { defineThemes } from "../lib/monacoThemes";
 import { can } from "../lib/permissions";
+import { resolveAnchorToLine } from "../lib/anchors";
 
 export default function Room() {
   const { roomId } = useParams();
@@ -77,6 +79,18 @@ export default function Room() {
   const isOwner = role === "owner";
   const isViewer = role === "viewer";
   const canEdit = can(role, "doc.edit");
+  const canAiRead = can(role, "ai.read");
+  const canAiReview = can(role, "ai.review");
+
+  // AI Code Review State
+  const [aiConfigured, setAiConfigured] = useState(false);
+  const [aiProvider, setAiProvider] = useState("AI provider");
+  const [aiReviews, setAiReviews] = useState([]);
+  const [activeAiReview, setActiveAiReview] = useState(null);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const aiCancelRef = useRef(false);
+  const aiDecorationsRef = useRef(null);
 
   // Helper to reliably get latest code from collab, editor, or room
   const getCode = useCallback(() => {
@@ -117,6 +131,40 @@ export default function Room() {
 
   useEffect(() => { loadSnapshots(); }, [loadSnapshots]);
 
+  // Load AI reviews & configuration status
+  const loadAiReviews = useCallback(() => {
+    if (!roomId) return;
+    api
+      .get(`/rooms/${roomId}/ai-reviews`)
+      .then((res) => {
+        setAiConfigured(true);
+        const list = res.data.reviews || [];
+        setAiReviews(list);
+        if (list.length > 0) {
+          setActiveAiReview((prev) => prev || list[0]);
+        }
+      })
+      .catch((err) => {
+        if (err.response?.status === 503) {
+          setAiConfigured(false);
+        }
+      });
+
+    api
+      .get(`/rooms/${roomId}/ai-reviews/status`)
+      .then((res) => {
+        if (res.data?.configured) {
+          setAiConfigured(true);
+          setAiProvider(res.data.provider || "AI provider");
+        }
+      })
+      .catch(() => {});
+  }, [roomId]);
+
+  useEffect(() => {
+    loadAiReviews();
+  }, [loadAiReviews]);
+
   // Live comment & snapshot socket events
   useEffect(() => {
     if (!collab?.socket) return;
@@ -144,6 +192,8 @@ export default function Room() {
       setRoom((prev) => (prev ? { ...prev, testCases: cases } : prev));
     };
 
+    const onAiChanged = () => loadAiReviews();
+
     socket.on("comment:new", onNew);
     socket.on("comment:resolved", onResolved);
     socket.on("comment:reply", onReply);
@@ -151,6 +201,7 @@ export default function Room() {
     socket.on("snapshots:changed", onSnapshotsChanged);
     socket.on("room:restored", onRoomRestored);
     socket.on("tests:updated", onTestsUpdated);
+    socket.on("ai:changed", onAiChanged);
 
     return () => {
       socket.off("comment:new", onNew);
@@ -160,6 +211,7 @@ export default function Room() {
       socket.off("snapshots:changed", onSnapshotsChanged);
       socket.off("room:restored", onRoomRestored);
       socket.off("tests:updated", onTestsUpdated);
+      socket.off("ai:changed", onAiChanged);
     };
   }, [collab?.socket, collab, loadSnapshots, toast]);
 
@@ -295,7 +347,122 @@ export default function Room() {
       if (!canEdit || collab?.status !== "synced") return;
       collab?.redo();
     });
+
+    editor.onMouseDown?.((e) => {
+      if (e.target?.type === 2) {
+        setSidePanelOpen(true);
+        setActiveSideTab("ai");
+      }
+    });
   };
+
+  // AI Review handlers
+  const handleRunAiReview = async ({ focus = "all" }) => {
+    setAiRunning(true);
+    setAiError(null);
+    aiCancelRef.current = false;
+
+    try {
+      const res = await api.post(`/rooms/${roomId}/ai-review`, { focus });
+      if (aiCancelRef.current) return;
+      const review = res.data.review;
+      setAiReviews((prev) => [review, ...prev.filter((r) => r._id !== review._id)]);
+      setActiveAiReview(review);
+      toast.success("AI code review completed");
+    } catch (err) {
+      if (aiCancelRef.current) return;
+      const msg = getErrorMessage(err, "Failed to complete AI review");
+      setAiError(msg);
+      toast.error(msg);
+    } finally {
+      setAiRunning(false);
+    }
+  };
+
+  const handleCancelAiReview = () => {
+    aiCancelRef.current = true;
+    setAiRunning(false);
+  };
+
+  const handleAddAiFindingAsComment = async ({ line, content }) => {
+    try {
+      const res = await api.post(`/comments/${roomId}`, { line, text: content });
+      const newComment = res.data.comment;
+      setComments((prev) => (prev.some((c) => c._id === newComment._id) ? prev : [...prev, newComment]));
+      toast.success("Added AI suggestion as comment");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to add comment"));
+    }
+  };
+
+  const handleDeleteAiReview = async (id) => {
+    try {
+      await api.delete(`/rooms/${roomId}/ai-reviews/${id}`);
+      setAiReviews((prev) => prev.filter((r) => r._id !== id));
+      if (activeAiReview?._id === id) {
+        setActiveAiReview(null);
+      }
+      toast.success("Review deleted");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to delete review"));
+    }
+  };
+
+  const handleJumpToLine = (lineNumber) => {
+    if (!editorRef.current || !lineNumber) return;
+    editorRef.current.revealLineInCenter(lineNumber);
+    editorRef.current.setPosition({ lineNumber, column: 1 });
+    editorRef.current.focus();
+  };
+
+  // AI findings decorations in Monaco Editor
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (!aiDecorationsRef.current) {
+      aiDecorationsRef.current = editorRef.current.createDecorationsCollection();
+    }
+
+    const model = editorRef.current.getModel();
+    if (!model || !activeAiReview || !activeAiReview.findings) {
+      aiDecorationsRef.current.clear();
+      return;
+    }
+
+    const ytext = collab?.ytext;
+    const lineCount = model.getLineCount();
+    const decorations = [];
+
+    for (const f of activeAiReview.findings) {
+      let line = f.line;
+      if (f.anchor && ytext) {
+        const liveLine = resolveAnchorToLine(f.anchor, ytext, model);
+        if (liveLine !== null) line = liveLine;
+      }
+
+      if (line >= 1 && line <= lineCount) {
+        decorations.push({
+          range: {
+            startLineNumber: line,
+            startColumn: 1,
+            endLineNumber: line,
+            endColumn: 1,
+          },
+          options: {
+            isWholeLine: true,
+            className: "ai-line",
+            glyphMarginClassName: "ai-glyph",
+            hoverMessage: {
+              value: `**AI [${f.category.toUpperCase()} - ${f.severity.toUpperCase()}]**: ${f.message}${
+                f.suggestion ? `\n\n\`\`\`\n${f.suggestion}\n\`\`\`` : ""
+              }`,
+            },
+          },
+        });
+      }
+    }
+
+    aiDecorationsRef.current.set(decorations);
+  }, [activeAiReview, collab?.ytext]);
 
   // Comment handlers
   const handleAddComment = async ({ line, text }) => {
@@ -562,6 +729,38 @@ export default function Room() {
             )}
           </button>
 
+          {/* AI Code Review */}
+          {aiConfigured && canAiRead && (
+            <button
+              type="button"
+              onClick={() => {
+                if (sidePanelOpen && activeSideTab === "ai") {
+                  setSidePanelOpen(false);
+                } else {
+                  setSidePanelOpen(true);
+                  setActiveSideTab("ai");
+                }
+              }}
+              aria-label="AI code review"
+              title="AI code review"
+              className={`flex items-center gap-1.5 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-xs font-semibold border transition cursor-pointer select-none shrink-0 ${
+                sidePanelOpen && activeSideTab === "ai"
+                  ? "bg-white text-slate-900 border-white shadow-sm font-bold"
+                  : "border-white/10 text-slate-300 hover:text-white bg-white/[0.08] hover:bg-white/[0.14]"
+              }`}
+            >
+              <svg className="size-3.5 text-purple-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 011.393 1.157l-.427 1.745 1.745-.427a1 1 0 011.157 1.393l-.8 1.599L19.897 15A1 1 0 0118.9 16H17.58l-1.582 3.954a1 1 0 01-1.157 1.393l-1.745-.427.427 1.745a1 1 0 01-1.393 1.157l-1.599-.8L9 23.897A1 1 0 018 22.9V21.58l-3.954-1.582-1.599.8A1 1 0 011.054 19.44l.427-1.745-1.745.427A1 1 0 01-.421 16.73l.8-1.599L-1.897 13A1 1 0 01-.9 12H.42l1.582-3.954a1 1 0 011.157-1.393l1.745.427-.427-1.745a1 1 0 011.393-1.157l1.599.8L9 4.103V3a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              <span className="hidden md:inline">AI Review</span>
+              {(activeAiReview?.findings?.length || 0) > 0 && (
+                <span className="text-[10px] text-purple-400 font-mono font-bold">
+                  ({activeAiReview.findings.length})
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Undo and Redo (hidden for viewers, disabled when stack empty) */}
           {!isViewer && (
             <div className="flex items-center rounded-full border border-white/10 bg-white/[0.08] p-0.5 shrink-0" role="group" aria-label="Undo and redo">
@@ -776,6 +975,24 @@ export default function Room() {
                     {snapshots.length}
                   </span>
                 </button>
+                {aiConfigured && canAiRead && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveSideTab("ai")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                      activeSideTab === "ai"
+                        ? "bg-canvas text-fg shadow-xs font-bold"
+                        : "text-muted hover:text-fg"
+                    }`}
+                  >
+                    <span>AI Review</span>
+                    {(activeAiReview?.findings?.length || 0) > 0 && (
+                      <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.2 rounded-full font-mono font-bold">
+                        {activeAiReview.findings.length}
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
               <button
                 type="button"
@@ -798,7 +1015,7 @@ export default function Room() {
                   onDelete={handleDeleteComment}
                   isEmbedded
                 />
-              ) : (
+              ) : activeSideTab === "history" ? (
                 <HistoryPanel
                   snapshots={snapshots}
                   role={role}
@@ -812,7 +1029,27 @@ export default function Room() {
                   }}
                   loading={snapshotsLoading}
                 />
-              )}
+              ) : activeSideTab === "ai" ? (
+                <AiReviewPanel
+                  roomId={roomId}
+                  reviews={aiReviews}
+                  activeReview={activeAiReview}
+                  onSelectReview={setActiveAiReview}
+                  onRunReview={handleRunAiReview}
+                  running={aiRunning}
+                  onCancelRun={handleCancelAiReview}
+                  canReview={canAiReview}
+                  provider={aiProvider}
+                  onJumpToLine={handleJumpToLine}
+                  onAddAsComment={handleAddAiFindingAsComment}
+                  onDeleteReview={handleDeleteAiReview}
+                  currentUserId={user?._id || user?.id}
+                  roomOwnerId={room?.createdBy?._id || room?.createdBy}
+                  ytext={collab?.ytext}
+                  editorModel={editorRef.current?.getModel?.()}
+                  error={aiError}
+                />
+              ) : null}
             </div>
           </div>
         )}
