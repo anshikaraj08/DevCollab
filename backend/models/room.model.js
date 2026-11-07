@@ -7,6 +7,8 @@ const roomSchema = new mongoose.Schema(
     code: { type: String, default: "" },
     // Phase 2: the saved Yjs document. Hidden from normal queries because it is large.
     yState: { type: Buffer, select: false },
+    // Phase 4 Stage 5: update log compaction checkpoint
+    compactedUntil: { type: mongoose.Schema.Types.ObjectId, ref: "YUpdate", default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     users: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     // Phase 3: roles mapping userId -> "editor" | "viewer" (owner is always createdBy)

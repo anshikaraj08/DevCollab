@@ -6,13 +6,20 @@ import connectDB from "./db/db.js";
 import logger from "./utils/logger.js";
 import env from "./config/env.js";
 import { initSockets } from "./sockets/index.js";
+import { initRedis, closeRedis } from "./config/redis.js";
 
 const PORT = env?.PORT || process.env.PORT || 5000;
 const server = http.createServer(app);
 
+// Initialize Redis clients for scale-out if REDIS_URL is configured
+const redisClients = initRedis();
+if (redisClients) {
+  app.locals.redis = redisClients.redisClient;
+}
+
 // Socket.IO shares the same HTTP server as Express
-const { io, store } = initSockets(server);
-app.set("io", io); // the comment routes use this to announce changes
+const { io, store } = initSockets(server, { redisClients });
+app.set("io", io); // comment and room routes announce changes via socket
 app.set("store", store);
 
 connectDB().then(() => {
@@ -54,6 +61,12 @@ export const shutdown = async (signal = "SIGTERM") => {
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close(false);
       logger.info("MongoDB connection closed");
+    }
+
+    // 6. Close Redis connections if initialized
+    if (redisClients) {
+      await closeRedis();
+      logger.info("Redis connections closed");
     }
 
     clearTimeout(forceExitTimer);

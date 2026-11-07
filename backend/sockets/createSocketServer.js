@@ -1,19 +1,35 @@
 import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
 import * as Y from "yjs";
 import { roomKey } from "./roomKey.js";
+import { activeSocketsGauge } from "../config/metrics.js";
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 const MAX_UPDATE_BYTES = 512 * 1024; // largest single Yjs update we accept
-const MAX_EVENTS_PER_SECOND = 120;   // per socket
+const MAX_EVENTS_PER_SECOND = 120; // per socket
 
-const toBytes = (x) => (x instanceof Uint8Array ? x : x instanceof ArrayBuffer ? new Uint8Array(x) : null);
+const toBytes = (x) => {
+  if (x instanceof Uint8Array) return x;
+  if (x instanceof ArrayBuffer) return new Uint8Array(x);
+  if (x && Array.isArray(x.data)) return new Uint8Array(x.data);
+  if (Array.isArray(x)) return new Uint8Array(x);
+  return null;
+};
 
 /**
- * All the real-time logic. Everything it needs from the outside is passed in,
- * so it can be tested without MongoDB.
+ * All real-time socket and collaborative logic.
+ * Supports both standalone single-process mode and multi-instance scale-out via Redis adapter.
  */
 export function createSocketServer(httpServer, deps) {
-  const { store, corsOrigin, verifyToken, getUser, getRoomForMember, logger = console } = deps;
+  const {
+    store,
+    corsOrigin,
+    verifyToken,
+    getUser,
+    getRoomForMember,
+    redisClients = null,
+    logger = console,
+  } = deps;
 
   const allowedOrigins = Array.isArray(corsOrigin)
     ? corsOrigin
@@ -43,13 +59,42 @@ export function createSocketServer(httpServer, deps) {
     cors: corsConfig,
     maxHttpBufferSize: 1e6,
   });
-  const awarenessByRoom = new Map(); // roomId -> Map(socketId -> { clientId, update })
+
+  // Attach Redis adapter and replica updates subscriber if Redis is configured
+  if (redisClients?.pubClient && redisClients?.subClient) {
+    const { pubClient, subClient, instanceId } = redisClients;
+    io.adapter(createAdapter(pubClient, subClient));
+
+    const REPLICA_CHANNEL = "devcollab:replica:updates";
+    subClient.subscribe(REPLICA_CHANNEL, (err) => {
+      if (err) {
+        logger.error?.({ err: err.message }, "[Redis] Failed to subscribe to replica channel");
+      }
+    });
+
+    subClient.on("message", (channel, message) => {
+      if (channel !== REPLICA_CHANNEL) return;
+      try {
+        const data = JSON.parse(message);
+        if (!data || data.instanceId === instanceId) return;
+        const { roomId, update: base64Update } = data;
+        const entry = store.peek(roomId);
+        if (!entry) return;
+
+        const update = Buffer.from(base64Update, "base64");
+        Y.applyUpdate(entry.doc, new Uint8Array(update), "redis");
+      } catch (err) {
+        logger.error?.({ err: err.message }, "[Redis] Error applying replica update");
+      }
+    });
+  }
+
   const socketsByUserId = new Map(); // userId -> Set(socketId)
 
   store.onSaved = (roomId, at) => io.to(roomKey(roomId)).emit("room:saved", { roomId, at });
   store.onServerUpdate = (roomId, update) => io.to(roomKey(roomId)).emit("yjs:update", { roomId, update });
 
-  // 1) Who is connecting? The access token is sent in the handshake.
+  // 1) Authentication handshake
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -67,6 +112,7 @@ export function createSocketServer(httpServer, deps) {
       }
 
       socket.data.user = { id: userId, name: user.name };
+      socket.data.awareness = {};
       next();
     } catch {
       next(new Error("AUTH"));
@@ -74,6 +120,7 @@ export function createSocketServer(httpServer, deps) {
   });
 
   io.on("connection", (socket) => {
+    activeSocketsGauge?.inc?.();
     const userId = socket.data.user.id;
     let userSockets = socketsByUserId.get(userId);
     if (!userSockets) socketsByUserId.set(userId, (userSockets = new Set()));
@@ -84,6 +131,7 @@ export function createSocketServer(httpServer, deps) {
 
     socket.data.rooms = new Set();
     socket.data.roles = {};
+    socket.data.awareness = {};
     socket.data.queue = Promise.resolve();
 
     const serial = (fn) => {
@@ -109,11 +157,9 @@ export function createSocketServer(httpServer, deps) {
       if (!joined(roomId)) return;
       socket.data.rooms.delete(roomId);
       delete socket.data.roles[roomId];
-      const map = awarenessByRoom.get(roomId);
-      const info = map?.get(socket.id);
+      const info = socket.data.awareness?.[roomId];
       if (info) {
-        map.delete(socket.id);
-        if (map.size === 0) awarenessByRoom.delete(roomId);
+        delete socket.data.awareness[roomId];
         io.to(roomKey(roomId)).emit("awareness:remove", { roomId, clientId: info.clientId });
       }
       await socket.leave(roomKey(roomId));
@@ -121,7 +167,7 @@ export function createSocketServer(httpServer, deps) {
       logger.info({ userId: socket.data.user.id, roomId }, "Socket left room");
     };
 
-    // 2) Join a room: only members are allowed. The reply carries the whole document and role.
+    // 2) Join a room: only members are allowed. Cross-instance awareness collected.
     socket.on("room:join", (payload, ack) => {
       const reply = typeof ack === "function" ? ack : () => {};
       serial(async () => {
@@ -140,7 +186,17 @@ export function createSocketServer(httpServer, deps) {
           socket.data.rooms.add(roomId);
           await socket.join(roomKey(roomId));
         }
-        const awareness = [...(awarenessByRoom.get(roomId)?.values() ?? [])].map((s) => s.update);
+
+        // Collect awareness updates from all sockets across all cluster instances
+        const remoteSockets = await io.in(roomKey(roomId)).fetchSockets();
+        const awareness = [];
+        for (const s of remoteSockets) {
+          if (s.id === socket.id) continue;
+          const aw = s.data?.awareness?.[roomId];
+          const b = toBytes(aw?.update);
+          if (b) awareness.push(b);
+        }
+
         logger.info({ userId: socket.data.user.id, roomId, role: room.role }, "Socket joined room");
         reply({ ok: true, state: Y.encodeStateAsUpdate(entry.doc), awareness, room, user: socket.data.user });
       }).catch((err) => {
@@ -186,13 +242,15 @@ export function createSocketServer(httpServer, deps) {
       const update = toBytes(payload?.update);
       const clientId = Number(payload?.clientId);
       if (!joined(roomId) || !update || update.byteLength > 4096 || !Number.isInteger(clientId)) return;
-      let map = awarenessByRoom.get(roomId);
-      if (!map) awarenessByRoom.set(roomId, (map = new Map()));
-      map.set(socket.id, { clientId, update });
+
+      socket.data.awareness = socket.data.awareness || {};
+      socket.data.awareness[roomId] = { clientId, update };
+
       socket.to(roomKey(roomId)).emit("awareness:update", { roomId, update });
     });
 
     socket.on("disconnect", () => {
+      activeSocketsGauge?.dec?.();
       const uSockets = socketsByUserId.get(userId);
       if (uSockets) {
         uSockets.delete(socket.id);
@@ -205,7 +263,7 @@ export function createSocketServer(httpServer, deps) {
     });
   });
 
-  // Synchronize room membership: updates roles or removes disconnected/removed members
+  // Synchronize room membership across all instances
   io.syncRoomMembership = async (roomId) => {
     try {
       const socketsInRoom = await io.in(roomKey(roomId)).fetchSockets();
@@ -214,17 +272,19 @@ export function createSocketServer(httpServer, deps) {
         if (!room) {
           logger.info({ userId: s.data.user.id, roomId }, "Socket removed from room via sync");
           s.emit("room:removed", { roomId });
-          const map = awarenessByRoom.get(roomId);
-          const info = map?.get(s.id);
+          const info = s.data?.awareness?.[roomId];
           if (info) {
-            map.delete(s.id);
-            if (map.size === 0) awarenessByRoom.delete(roomId);
+            if (s.data?.awareness) delete s.data.awareness[roomId];
             io.to(roomKey(roomId)).emit("awareness:remove", { roomId, clientId: info.clientId });
           }
-          s.data.rooms?.delete(roomId);
-          delete s.data.roles?.[roomId];
           await s.leave(roomKey(roomId));
-          await store.release(roomId);
+
+          const local = io.sockets.sockets.get(s.id);
+          if (local) {
+            local.data.rooms?.delete(roomId);
+            delete local.data.roles?.[roomId];
+            await store.release(roomId);
+          }
         } else {
           s.data.roles = s.data.roles || {};
           if (s.data.roles[roomId] !== room.role) {

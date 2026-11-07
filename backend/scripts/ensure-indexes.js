@@ -21,6 +21,7 @@ import AuthToken from "../models/authToken.model.js";
 import AiReview from "../models/aiReview.model.js";
 import Notification from "../models/notification.model.js";
 import Lease from "../models/lease.model.js";
+import YUpdate from "../models/yUpdate.model.js";
 
 const models = [
   { name: "User", model: User },
@@ -32,6 +33,7 @@ const models = [
   { name: "AiReview", model: AiReview },
   { name: "Notification", model: Notification },
   { name: "Lease", model: Lease },
+  { name: "YUpdate", model: YUpdate },
 ];
 
 async function ensureIndexes() {

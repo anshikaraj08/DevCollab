@@ -1,5 +1,7 @@
 import rateLimit from "express-rate-limit";
+import { RedisStore } from "rate-limit-redis";
 import ApiError from "../utils/ApiError.js";
+import { getRedisClient } from "../config/redis.js";
 
 /**
  * Rate limit middleware factory.
@@ -10,7 +12,8 @@ import ApiError from "../utils/ApiError.js";
  * @param {"ip" | "user" | "ip-email"} [config.keyType="ip"]
  */
 export function createRateLimiter({ windowMs, max, message, keyType = "ip" }) {
-  return rateLimit({
+  const redis = getRedisClient();
+  const limiterConfig = {
     windowMs,
     max,
     message,
@@ -46,7 +49,17 @@ export function createRateLimiter({ windowMs, max, message, keyType = "ip" }) {
       res.setHeader("Retry-After", String(retryAfter));
       next(new ApiError(429, options.message || "Too many requests, please try again later"));
     },
-  });
+  };
+
+  // If Redis is configured, use RedisStore for distributed rate limiting across instances
+  if (redis) {
+    limiterConfig.store = new RedisStore({
+      sendCommand: (...args) => redis.call(...args),
+      prefix: "rl:",
+    });
+  }
+
+  return rateLimit(limiterConfig);
 }
 
 export const forgotPasswordLimiter = createRateLimiter({

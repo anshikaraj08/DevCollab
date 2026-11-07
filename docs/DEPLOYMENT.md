@@ -125,3 +125,35 @@ The script will assert:
 * **Login Fails on Refresh (Missing Cookies):** Verify `COOKIE_SAMESITE=none` is set in Render environment variables. Cross-site cookies between `.onrender.com` and `.vercel.app` require `SameSite=None; Secure`.
 * **Render Cold Start Delay:** When accessing after 15 minutes of inactivity, wait 30 seconds for the container to wake up. Check `https://<backend>.onrender.com/readyz` in your browser to confirm readiness.
 
+---
+
+## 5. Multi-Instance Scale-Out with Redis (Stage 5)
+
+DevCollab supports horizontal multi-instance scale-out across multiple backend containers while maintaining full single-process backwards compatibility when Redis is absent.
+
+### Architecture Overview
+1. **Socket.IO Redis Adapter (`@socket.io/redis-adapter`):** Broadcasts room events, cursor awareness, and notifications across all server replicas.
+2. **Append-Only Update Log (`YUpdate` in MongoDB):** Each instance buffers collaborative edits and commits merged update batches every 500ms.
+3. **Replica Updates Pub/Sub (`devcollab:replica:updates`):** Live CRDT edits are published across instances and applied in memory with origin `"redis"`.
+4. **30-Second Resync Poll:** Each loaded document polls `persistence.loadSince(roomId, lastSeenId)` every 30 seconds as an automated safety net against dropped pub/sub packets.
+5. **Compaction Lease (`compact:<roomId>`):** Distributed Redis mutex with a 30s TTL prevents duplicate compaction runs across replicas.
+6. **No Sticky Sessions Requirement:** Application convergence does not require sticky sessions because any instance can serve any user and load any document from the durable log.
+   > **Transport Upgrade Note:** Socket.IO by default starts with HTTP long-polling and upgrades to WebSocket. If deploying behind a load balancer without sticky sessions, configure the client with `transports: ["websocket"]` to connect directly without polling handshake splits.
+
+### Running Two Replicas Locally with Docker Compose
+To run MongoDB, Redis, and two backend replicas alongside the frontend:
+```bash
+docker compose --profile scale-out up --build
+```
+- Primary Backend Replica 1: `http://localhost:5000`
+- Secondary Backend Replica 2: `http://localhost:5001`
+- Redis Container: `localhost:6379`
+- Frontend: `http://localhost`
+
+### Free-Tier Cloud Redis Deployment (Upstash)
+1. Create a free database on [Upstash Redis](https://upstash.com/).
+2. Copy the `rediss://...` connection URI.
+3. Add `REDIS_URL` to your backend environment variables in Render (or replica containers).
+4. The backend automatically activates Redis pub/sub, the Socket.IO Redis adapter, and Redis-backed rate limiting.
+
+

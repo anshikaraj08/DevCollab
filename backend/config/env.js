@@ -31,6 +31,7 @@ export const envSchema = z.object({
   AI_MODEL: z.string().optional(),
   AI_API_KEY: z.string().optional(),
   AI_DAILY_REQUEST_LIMIT: z.coerce.number().default(100).optional(),
+  REDIS_URL: z.string().optional(),
 });
 
 /**
