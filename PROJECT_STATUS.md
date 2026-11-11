@@ -1,107 +1,89 @@
-# DevCollab — Project Status & Phase 3 Technical Handover
+# DevCollab — Project Status & Phase 4 Technical Handover
 
 > **Project:** DevCollab  
-> **Status:** Phase 3 Complete • Fully Functional • All 8 Backend Test Suites Passing (46/46) • All 9 Frontend Test Suites Passing (27/27) • CI Workflow Configured • Production Build Green  
-> **Repository Branch:** `phase-3`  
+> **Status:** Phase 4 Complete • Production-Ready • 15 Backend Test Suites Passing (119/119) • 12 Frontend Test Suites Passing (57/57) • Load Tests Verified • CI Workflow Configured • Production Build Green  
+> **Repository Branch:** `phase-4`  
 
 ---
 
 ## 1. Executive Summary
 
-DevCollab has completed **Phase 3** implementation as defined in `PHASE_3_PLAN.md`. The platform combines real-time multiplayer code collaboration (Yjs CRDTs + Socket.IO) with robust role-based access control, ephemeral token invitations, version snapshot management with diffing, isolated collaborative undo/redo, multi-language code execution with standard input (`stdin`), shared workspace test cases, security headers, user-keyed rate limits, socket connection hardening, automated CI workflows, and accessibility enhancements.
+DevCollab has completed **Phase 4** implementation as defined in `PHASE_4_PLAN.md`. The platform combines real-time multiplayer code collaboration (Yjs CRDTs + Monaco Editor + Socket.IO) with horizontal multi-instance scale-out (Redis Pub/Sub adapter + MongoDB append-only update log), AI-assisted code reviews with line-anchored gutter glyphs, threaded comments with @mentions and live in-app notifications, Google and GitHub OAuth authentication with state/PKCE and password reset, Prometheus observability and Sentry error tracking, automated Docker containerization, and free-tier cloud deployment guides (Render + Vercel + MongoDB Atlas + Upstash Redis).
 
 ---
 
-## 2. Phase 3 Stages Completed
+## 2. Phase 4 Stages Completed
 
-### Stage 0: Security & Baseline Hardening ✅
-- **Zod Environment Validation:** Required `MONGO_URI`, `JWT_ACCESS_SECRET` (≥32 chars), and `JWT_REFRESH_SECRET` (≥32 chars) validated at backend boot (`backend/config/env.js`).
-- **HTTP Security Headers:** Integrated `helmet` with pre-configured CSP allowing Wandbox execution and Monaco Web Workers.
-- **Role-Based Access Control Matrix:** Formalized `owner`, `editor`, and `viewer` roles with 15 actions in `backend/utils/roles.js` and `frontend/src/lib/permissions.js`.
-- **IP- and User-Keyed Rate Limiting:** Applied in-memory windowed rate limiters:
-  - Auth endpoints: 10 requests / 15 minutes per IP.
-  - Code execution: 30 requests / minute per user.
-  - Snapshot creation: 20 snapshots / hour per user.
-  - Invite generation: 30 invites / hour per user.
+### Stage 0: Production Readiness & Observability ✅
+- **Observability & Sentry:** Integrated `@sentry/node` (backend) and `@sentry/react` (frontend) with source code redaction and environment-based rate sampling.
+- **Prometheus Metrics:** Integrated `prom-client` exposing `/metrics` with standard HTTP metrics, active socket counts, and CRDT update timings.
+- **Health Checks:** Added lightweight `/healthz` (liveness) and comprehensive `/readyz` (readiness verifying MongoDB ping and optional Redis connection).
+- **Graceful Shutdown:** Implemented process signal handlers (`SIGTERM`, `SIGINT`) terminating connections, draining pending Yjs flush buffers, and closing server instances cleanly within 10 seconds.
+- **Trust Proxy:** Configured Express `trust proxy` for correct client IP detection behind reverse proxies and load balancers.
+- **Environment Validation:** Expanded Zod schema in `backend/config/env.js` covering 26 environment variables with fallbacks.
 
-### Stage 1: Roles, Invites & Live Membership ✅
-- **Room Model Roles:** `roles: { type: Map, of: String }` mapping user IDs to `"editor"` or `"viewer"`.
-- **Token Invite Model (`backend/models/invite.model.js`):** 64-character hex tokens with expiration (`expiresAt`), max uses (`maxUses`), use tracking (`uses`), and revocation (`revokedAt`).
-- **Invite Routes & UI:**
-  - `POST /rooms/:roomId/invites` (owner only) — generate invite link with role, expiry, and max uses.
-  - `GET /rooms/:roomId/invites` (owner only) — list active invites with copy link and revoke actions.
-  - `DELETE /rooms/:roomId/invites/:inviteId` (owner only) — revoke invite.
-  - `GET /invites/:token` (authenticated) — inspect invite metadata and room details.
-  - `POST /invites/:token/accept` (authenticated) — accept invite and redirect to workspace room.
-  - `GET /invite/:token` screen with automated acceptance and direct redirection.
-- **Collaborator Management:**
-  - `GET /rooms/:roomId/members` — list room collaborators with roles and joined dates.
-  - `PATCH /rooms/:roomId/members/:userId` (owner only) — change member role between editor and viewer.
-  - `DELETE /rooms/:roomId/members/:userId` — remove collaborator (owner) or leave workspace (self).
-- **Live Membership Sync:** Real-time push via `io.syncRoomMembership(roomId)` emitting `room:role` or `room:removed` without requiring page reloads.
+### Stage 1: Deployment Configuration & Monitoring ✅
+- **Docker Multi-Stage Builds:** Multi-stage production `Dockerfile` in `backend/` running as non-root user `node` with health check.
+- **Docker Compose:** Configured `docker-compose.yml` supporting single-node and multi-instance (`--profile scale-out`) topologies with MongoDB and Redis.
+- **Deployment Documentation:** Detailed zero-cost cloud deployment guide in `docs/DEPLOYMENT.md` using Render (backend), Vercel (frontend), MongoDB Atlas (database), and Upstash (Redis).
+- **Smoke Test & Index Sync:** Created `scripts/smoke.mjs` verifying deployment end-to-end and `backend/scripts/ensure-indexes.js` ensuring unique and compound MongoDB indexes.
 
-### Stage 2: Version Snapshots & Diff View ✅
-- **Snapshot Model (`backend/models/snapshot.model.js`):** Stores `name`, `code`, `room`, `createdBy`, `kind: "manual" | "pre-restore"`. Compound index `{ room: 1, createdAt: -1 }`.
-- **Snapshot Limits & Validation:** Maximum 50 snapshots per room, 200k characters max code size, 20 snapshots/hour rate limit.
-- **Live DocStore Replacement:** `DocStore.replaceText(roomId, text)` atomically replaces live Yjs text and emits `yjs:update` to sync all active collaborators.
-- **Snapshots API:**
-  - `GET /rooms/:roomId/snapshots` — list versions (sorted newest first, without code payload for speed).
-  - `POST /rooms/:roomId/snapshots` (owner, editor) — create snapshot.
-  - `GET /rooms/:roomId/snapshots/:id` — get single snapshot with full code.
-  - `POST /rooms/:roomId/snapshots/:id/restore` (owner, editor) — auto-saves a pre-restore backup checkpoint, restores snapshot code into the live Yjs doc, and broadcasts `room:restored` & `snapshots:changed`.
-  - `DELETE /rooms/:roomId/snapshots/:id` — delete snapshot (owner can delete any, editor can delete own).
-- **HistoryPanel & DiffView Components:**
-  - `HistoryPanel.jsx`: Tabbed view alongside comments, relative timestamps, author avatars, "Pre-restore" badges, Save Version modal, and Restore/Delete dialogs.
-  - `DiffView.jsx`: Non-destructive Monaco `DiffEditor` overlay comparing past versions against current code side-by-side or inline, with live refresh capability.
+### Stage 2: Accounts, OAuth, Email & Password Reset ✅
+- **OAuth 2.0 Integration:** Google and GitHub single-sign-on using state tokens, PKCE code verifiers, and secure cookie flow without exposing access tokens in browser URLs.
+- **Account Linking & Unlinking:** Account settings in `frontend/src/pages/Settings.jsx` supporting linking multiple providers with safety guards preventing unlinking the sole authentication method.
+- **Password Reset Flow:** Cryptographically secure 64-char hex tokens with 1-hour expiration, password reset route with session invalidation, and enumeration-resistant responses.
+- **Email Verification & Digests:** Mailer module (`backend/utils/mailer.js`) supporting Nodemailer / SMTP, verification banners, and unverified user restrictions.
 
-### Stage 3: Collaborative Undo & Redo ✅
-- **Scoped `Y.UndoManager`:** Integrated in `frontend/src/collab/monacoBinding.js` configured with `trackedOrigins: new Set([this])`. Undoing and redoing affects only the local participant's edits.
-- **Monaco Keyboard Bindings:** Intercepts `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`, and `Ctrl/Cmd+Y` inside the editor to route through `collab.undo()` and `collab.redo()`.
-- **Header Toolbar Buttons:** Reactive Undo and Redo buttons disabled when stacks are empty and hidden for viewers.
-- **History Clearing:** Automatically clears undo/redo stacks when restoring a snapshot (`room:restored`) or transitioning to read-only/disconnected status.
+### Stage 3: AI Code Review ✅
+- **Provider Agnostic Engine:** `backend/services/aiReviewService.js` supporting Google Gemini (`gemini-1.5-flash` / `gemini-1.5-pro`) and OpenAI (`gpt-4o-mini` / `gpt-4o`) with fallback mock mode for testing without API keys.
+- **Line-Anchored Findings:** Structured JSON review schema producing actionable recommendations categorized by severity (`error`, `warning`, `info`) with line numbers and refactoring suggestions.
+- **Monaco Gutter Glyphs:** Visual inline glyphs in the editor margin marking reviewed lines with popover review previews.
+- **One-Click Comment Conversion:** Findings can be promoted directly to persistent room comment threads with a single click.
+- **Prompt Injection Defense & Quotas:** Redaction of secrets/tokens prior to AI dispatch, strict prompt framing, and user/room rate limiting (5 reviews/hr per user, 20/day per room).
 
-### Stage 4: Runner Input & Shared Test Cases ✅
-- **Standard Input (`stdin`):** Supported up to 10,000 characters in `/run` endpoint. Persisted locally in browser under `devcollab:stdin:<roomId>` so personal inputs are not broadcast until run.
-- **Wandbox Runner Hardening:** 15s execution timeout via `AbortSignal.timeout(15000)`, capped stdout and stderr output at 100,000 characters with truncation notices, 502 Bad Gateway fallback.
-- **Shared Test Suites:**
-  - Embedded in `room.testCases: [{ name, input, expected }]` (max 10 cases, 60 char name, 2000 char input/expected).
-  - `GET /rooms/:roomId/tests` & `PUT /rooms/:roomId/tests` (owner/editor).
-  - Real-time `tests:updated` socket broadcast across collaborators.
-- **ConsoleDrawer Component (`frontend/src/components/room/ConsoleDrawer.jsx`):**
-  - Tabbed interface: "Output", "Input", "Tests".
-  - Sequential "Run all" test suite runner (halting immediately on 429 rate limit errors).
-  - Status badges: Pass (duration ms) and Fail.
-  - Expected vs. Actual output mismatch diff view with whitespace and character highlighting.
-  - Read-only enforcement for viewers (inputs disabled, add/delete buttons hidden, "View-only" badge).
+### Stage 4: Comments v2 & Notifications ✅
+- **Comment In-Place Editing:** Author-restricted comment editing with live `comment:updated` socket broadcast and `(edited)` indicators.
+- **@Mentions Autocomplete:** Interactive mention picker popup triggered by `@` in comments and replies, keyboard navigable (`ArrowUp`, `ArrowDown`, `Enter`, `Escape`), suggesting room collaborators.
+- **Notification Center:** Header bell icon with real-time unread badge, interactive dropdown list, pagination, mark-as-read actions, and deep links opening the target workspace and focusing the comment thread.
+- **Email Digest Batching:** Background scheduler batching unread mention notifications into periodic email digests with single-click token unsubscribe links.
 
-### Stage 5: Hardening, CI, Accessibility & Documentation ✅
-- **Socket Connection Hardening:**
-  - Max 10 concurrent sockets per user (rejecting excess handshakes with `TOO_MANY`).
-  - Structured pino logging on socket connections, leaves, joins, role changes, and rate limits (tokens never logged).
-- **Continuous Integration (`.github/workflows/ci.yml`):**
-  - Runs on push and pull requests to `main`, `master`, and `phase-3`.
-  - Node.js 22 setup, MongoDB 7.0 container service, npm dependency caching, backend test execution, frontend test execution, and production build verification.
-- **Accessibility Pass:**
-  - Focus trap, Escape key handling, and focus return on dialog close in `frontend/src/components/ui/Modal.jsx`.
-  - Full `aria-label` tags on all header icon buttons and panel actions.
-  - Multi-attribute indicators (color + icons + text badges) for roles and test results.
-- **Documentation:**
-  - `README.md` updated with architecture, quick start, and test scripts.
-  - `docs/PERMISSIONS.md` added with the comprehensive RBAC permission matrix.
-  - `.env.example` created in backend and project root.
+### Stage 5: Scale-out with Redis & Update Log Persistence ✅
+- **Durable Persistence Interface:** Clean abstraction (`load`, `append`, `compact`, `loadSince`) separating memory doc lifecycle from database storage.
+- **MongoDB Append-Only Log:** Granular updates buffered and persisted to `yupdates` collection every 500ms using `Y.mergeUpdates`.
+- **Socket.IO Redis Adapter:** Distributed pub/sub broadcasting room events and awareness state across independent backend processes when `REDIS_URL` is set.
+- **Cross-Instance Replica Sync:** Live CRDT updates propagated via Redis channel `devcollab:replica:updates` tagged with origin `"redis"`.
+- **Safety Net 30-Second Polling:** Loaded documents continuously poll missing updates from the durable log, ensuring convergence even under network partitions or dropped pub/sub messages.
+- **Distributed Compaction Lease:** Redis-backed mutex `compact:<roomId>` preventing duplicate compaction runs across replicas.
+- **Zero-Redis Fallback:** Full single-instance backward compatibility when `REDIS_URL` is omitted.
+
+### Stage 6: Load Test, Security Review, Accessibility & Documentation ✅
+- **Load Test Harness:** Built `loadtest/run-loadtest.mjs` running realistic concurrent collaboration benchmarks across multiple rooms and server replicas.
+- **Performance Documentation:** Measured empirical throughput, latency distributions, and memory usage recorded in `docs/PERFORMANCE.md`.
+- **Security Audit:** Comprehensive 14-point security evaluation documented in `docs/SECURITY.md`.
+- **Accessibility Enhancements:** ARIA attributes, keyboard traps, escape handling, and high-contrast color validation across all new dialogs and widgets.
 
 ---
 
 ## 3. API Endpoints Reference
 
-### Authentication (`/users`)
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `POST` | `/users/register` | Public (Rate-limited: 10/15min) | Register new user account |
-| `POST` | `/users/login` | Public (Rate-limited: 10/15min) | Authenticate user & set HttpOnly refresh cookie |
-| `POST` | `/users/refresh` | Public | Issue new access token using refresh cookie |
-| `POST` | `/users/logout` | Authenticated | Clear refresh cookie |
-| `GET` | `/users/profile` | Authenticated | Get current user profile |
+### Authentication & Accounts (`/users`)
+| Method | Endpoint | Access | Rate Limit | Description |
+|---|---|---|---|---|
+| `POST` | `/users/register` | Public | 10 / 15m | Register new account with email & password |
+| `POST` | `/users/login` | Public | 10 / 15m | Authenticate user & set HttpOnly refresh cookie |
+| `POST` | `/users/refresh` | Public | — | Issue new short-lived JWT access token |
+| `POST` | `/users/logout` | Authenticated | — | Clear refresh token cookie |
+| `GET` | `/users/profile` | Authenticated | — | Retrieve current user profile and linked auth methods |
+| `POST` | `/users/forgot-password` | Public | 5 / 15m | Request password reset email (enumeration-resistant) |
+| `POST` | `/users/reset-password` | Public | 10 / 15m | Reset password using valid reset token |
+| `POST` | `/users/verify-email/request` | Authenticated | 5 / 15m | Re-send email verification link |
+| `POST` | `/users/verify-email/confirm` | Public | — | Confirm email address with token |
+| `GET` | `/users/auth/google` | Public | — | Initiate Google OAuth 2.0 flow with PKCE |
+| `GET` | `/users/auth/google/callback`| Public | — | Handle Google OAuth callback |
+| `GET` | `/users/auth/github` | Public | — | Initiate GitHub OAuth flow with state |
+| `GET` | `/users/auth/github/callback`| Public | — | Handle GitHub OAuth callback |
+| `DELETE`| `/users/auth/providers/:provider` | Authenticated | — | Unlink OAuth provider (guarded against zero auth methods) |
+| `GET`/`POST`| `/users/unsubscribe-digest` | Public (Token) | — | One-click unsubscribe from email notification digests |
 
 ### Workspaces (`/rooms`)
 | Method | Endpoint | Access | Description |
@@ -112,7 +94,7 @@ DevCollab has completed **Phase 3** implementation as defined in `PHASE_3_PLAN.m
 | `PUT` | `/rooms/:roomId/code` | Editor (`doc.edit`) | Save room code content |
 | `DELETE` | `/rooms/:roomId` | Owner (`room.delete`) | Delete room, snapshots, and comments |
 
-### Invites & Members (`/rooms/:roomId`)
+### Invites & Membership (`/rooms/:roomId`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `POST` | `/rooms/:roomId/invites` | Owner (`invites.manage`) | Generate new invite token |
@@ -133,12 +115,12 @@ DevCollab has completed **Phase 3** implementation as defined in `PHASE_3_PLAN.m
 | `POST` | `/rooms/:roomId/snapshots/:id/restore` | Editor (`snapshot.restore`) | Backup current & restore past version |
 | `DELETE` | `/rooms/:roomId/snapshots/:id` | Owner or Author (`snapshot.delete`) | Delete snapshot |
 
-### Comments & Threads (`/rooms/:roomId/comments` and `/comments`)
+### Comments & Mentions (`/rooms/:roomId/comments` and `/comments`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/rooms/:roomId/comments` | Member (`room.read`) | List all room comments with mentions and replies |
 | `POST` | `/rooms/:roomId/comments` | Member (`comment.write`) | Add new comment with line, content, and mentions |
-| `PATCH` | `/rooms/:roomId/comments/:commentId` | Author (`comment.edit`, Rate-limited: 30/min) | Edit comment content and mentions (sets `editedAt`) |
+| `PATCH` | `/rooms/:roomId/comments/:commentId` | Author (`comment.edit`) | Edit comment content and mentions (records `editedAt`) |
 | `POST` | `/comments/:commentId/reply` | Member (`comment.write`) | Reply to comment thread with mentions |
 | `PATCH` | `/comments/:commentId/resolve` | Member (`comment.write`) | Mark comment resolved |
 | `PATCH` | `/comments/:commentId/unresolve` | Member (`comment.write`) | Reopen resolved comment |
@@ -147,29 +129,31 @@ DevCollab has completed **Phase 3** implementation as defined in `PHASE_3_PLAN.m
 ### Notifications (`/notifications`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `GET` | `/notifications` | Authenticated (Rate-limited: 120/min) | List user notifications (supports `limit`, `before`, `unread`) |
+| `GET` | `/notifications` | Authenticated | List user notifications (supports `limit`, `before`, `unread`) |
 | `GET` | `/notifications/unread-count` | Authenticated | Get current unread notification count |
 | `POST` | `/notifications/read` | Authenticated | Mark notifications as read (`{ ids: [...] }` or `{ all: true }`) |
-| `GET`/`POST` | `/users/unsubscribe-digest` | Public (Token-authenticated) | One-click email digest unsubscribe link |
 
 ### AI Code Review (`/rooms/:roomId/ai-review`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `POST` | `/rooms/:roomId/ai-review` | Editor/Owner (`ai.review`, Rate-limited: 5/hr user, 20/day room) | Request AI code review with focus |
+| `POST` | `/rooms/:roomId/ai-review` | Editor/Owner (`ai.review`) | Request AI code review with focus |
 | `GET` | `/rooms/:roomId/ai-reviews` | Member (`ai.read`) | List previous AI reviews and findings |
 | `GET` | `/rooms/:roomId/ai-reviews/status` | Member (`ai.read`) | Check AI review configuration status |
 | `DELETE` | `/rooms/:roomId/ai-reviews/:reviewId` | Owner | Delete past AI code review |
 
-### Test Cases (`/rooms/:roomId/tests`)
+### Test Cases & Code Runner
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/rooms/:roomId/tests` | Member (`tests.read`) | Get room test cases (max 10) |
 | `PUT` | `/rooms/:roomId/tests` | Editor (`tests.write`) | Update room test cases |
+| `POST` | `/run` | Member (`run`) | Compile & execute code with stdin via Wandbox |
 
-### Runner (`/run`)
+### Monitoring & System
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `POST` | `/run` | Member (`run`, Rate-limited: 30/min) | Compile and execute code with stdin via Wandbox |
+| `GET` | `/healthz` | Public | Liveness probe returning 200 OK |
+| `GET` | `/readyz` | Public | Readiness probe verifying database & redis connectivity |
+| `GET` | `/metrics` | Public / Scraper | Prometheus metrics endpoint |
 
 ---
 
@@ -179,8 +163,8 @@ DevCollab has completed **Phase 3** implementation as defined in `PHASE_3_PLAN.m
 |---|---|---|---|
 | `room:join` | Client → Server | `{ roomId }` | Join room, receive initial Yjs update & role |
 | `room:leave` | Client → Server | `{ roomId }` | Leave room, release document lease |
-| `yjs:update` | Bi-directional | `{ roomId, update }` | Yjs CRDT document update (viewers rejected) |
-| `awareness:update` | Bi-directional | `{ roomId, clientId, update }` | Monaco cursor and selection presence |
+| `yjs:update` | Bi-directional | `{ roomId, update, sentAt }` | Yjs CRDT document update (viewers rejected) |
+| `awareness:update` | Bi-directional | `{ roomId, clientId, update, sentAt }` | Monaco cursor and selection presence |
 | `awareness:remove` | Server → Client | `{ roomId, clientId }` | Peer disconnected |
 | `room:role` | Server → Client | `{ roomId, role }` | Role updated in real time |
 | `room:removed` | Server → Client | `{ roomId }` | Member removed from room in real time |
@@ -192,61 +176,150 @@ DevCollab has completed **Phase 3** implementation as defined in `PHASE_3_PLAN.m
 | `comment:resolved` | Server → Client | `{ commentId, resolved }` | Comment resolved status changed |
 | `comment:reply` | Server → Client | `{ comment }` | Reply added to comment |
 | `comment:deleted` | Server → Client | `{ commentId }` | Comment deleted |
-| `notification:new` | Server → Client (User channel `user:<id>`) | `{ notification }` | Live notification pushed to recipient |
+| `notification:new` | Server → Client (Channel `user:<id>`) | `{ notification }` | Live notification pushed to recipient |
+| `room:saved` | Server → Client | `{ roomId, timestamp }` | Debounced indicator of durable save |
 
 ---
 
-## 5. Release Checklist
+## 5. Environment Variables Reference
 
-- [x] All backend test suites green (`node --test`, 8 suites, 46 tests passing).
-- [x] All frontend test suites green (`vitest run`, 9 suites, 27 tests passing).
-- [x] Production build passes cleanly with 0 errors (`npm run build`).
-- [x] CI pipeline configured with Node 22, MongoDB, and npm caching (`.github/workflows/ci.yml`).
-- [x] Environment validation with Zod in `backend/config/env.js`.
-- [x] `.env.example` committed in backend and root directories.
-- [x] Security headers with Helmet active.
-- [x] RBAC permission matrix documented in `docs/PERMISSIONS.md`.
-- [x] No `console.log` statements in committed backend or frontend source code.
-- [x] Accessibility focus traps, aria labels, and keyboard shortcuts verified.
-
----
-
-## 6. Phase 4 Backlog (Future Roadmap)
-
-1. **Production Deployment & Containerization:**
-   - Dockerfile and multi-stage container builds for backend and frontend.
-   - Reverse proxy configuration (Nginx / Caddy) with `app.set("trust proxy", 1)`.
-   - Production domain SSL/TLS termination and production cookie configurations (`sameSite: "none"`, `secure: true`).
-2. **Horizontal Scaling & Multi-Server Sockets:**
-   - Redis Pub/Sub adapter (`@socket.io/redis-adapter`) for multi-instance socket synchronization.
-   - Distributed Yjs doc store persistence leveraging Redis / MongoDB changes streams.
-3. **OAuth & Social Authentication:**
-   - GitHub and Google single-sign-on (SSO) integration via Passport.js or Auth0.
-   - Account linking and organization-level user directories.
-4. **AI-Powered Code Review:**
-   - LLM-assisted line reviews and refactoring suggestions integrated into the CommentPanel.
-   - Automated test case generation based on function signatures and language AST.
-5. **Enhanced Comment Capabilities:**
-   - Rich Markdown and code snippet rendering inside comment threads.
-   - In-place comment text editing and edit history audit log.
-6. **Notification System:**
-   - In-app notification center and email alerts (SendGrid / Resend) for replies, mentions, and workspace role changes.
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `PORT` | Optional | `5000` | Port for the backend Express server |
+| `NODE_ENV` | Optional | `development` | Runtime environment (`development`, `production`, `test`) |
+| `MONGO_URI` | **Required** | — | MongoDB connection string (Atlas or local replica set) |
+| `JWT_ACCESS_SECRET` | **Required** | — | Secret key for signing short-lived access tokens (≥32 chars) |
+| `JWT_REFRESH_SECRET` | **Required** | — | Secret key for signing refresh tokens (≥32 chars) |
+| `CLIENT_URL` | Optional | `http://localhost:5173` | Primary frontend client URL |
+| `CLIENT_URLS` | Optional | `CLIENT_URL` | Comma-separated list of allowed CORS origins |
+| `COOKIE_SAMESITE` | Optional | `lax` | Cookie `SameSite` policy (`lax`, `strict`, `none`) |
+| `COOKIE_DOMAIN` | Optional | — | Cookie domain attribute for sub-domain sharing |
+| `TRUST_PROXY` | Optional | `0` | Number of proxy hops to trust (`1` on Render / Fly / Heroku) |
+| `APP_VERSION` | Optional | `1.0.0` | Application release version for Sentry tracking |
+| `SENTRY_DSN` | Optional | — | Backend Sentry DSN for error reporting |
+| `REDIS_URL` | Optional | — | Redis connection URL for multi-instance pub/sub and scale-out |
+| `GOOGLE_CLIENT_ID` | Optional | — | Google OAuth 2.0 Client ID |
+| `GOOGLE_CLIENT_SECRET` | Optional | — | Google OAuth 2.0 Client Secret |
+| `GITHUB_CLIENT_ID` | Optional | — | GitHub OAuth Client ID |
+| `GITHUB_CLIENT_SECRET` | Optional | — | GitHub OAuth Client Secret |
+| `SMTP_HOST` | Optional | — | SMTP host for email delivery |
+| `SMTP_PORT` | Optional | `5887` | SMTP server port |
+| `SMTP_USER` | Optional | — | SMTP authentication username |
+| `SMTP_PASS` | Optional | — | SMTP authentication password |
+| `SMTP_FROM` | Optional | `noreply@devcollab.local` | Outgoing email sender address |
+| `AI_PROVIDER` | Optional | `mock` | AI Code Review provider (`gemini`, `openai`, `mock`) |
+| `GEMINI_API_KEY` | Optional | — | Google Gemini API key |
+| `OPENAI_API_KEY` | Optional | — | OpenAI API key |
+| `AI_DAILY_QUOTA` | Optional | `100` | Global daily limit for AI review requests |
 
 ---
 
-## 7. Manual QA Verification Guide
+## 6. How to Run Every Test Suite
 
-A 12-point manual QA script using 3 browser profiles (Owner, Editor, Viewer):
+### Backend Test Suite (Node.js Test Runner)
+```bash
+npm --prefix backend test
+```
+*Runs all 15 backend test suites with 119 unit and integration tests:*
+1. `env.test.js` — Environment variable validation and error handling
+2. `roles.test.js` — Permission matrix and RBAC role checks
+3. `auth.test.js` — Registration, login, refresh, logout
+4. `roomAccess.test.js` — Room authorization and membership
+5. `invites.test.js` — Ephemeral token invitations and acceptance
+6. `comments.test.js` — Comments, replies, and resolution
+7. `comment-editing-mentions.test.js` — In-place edit rules and @mention extraction
+8. `notifications.test.js` — Notification rules, pagination, read state, digests
+9. `snapshots.test.js` — Version snapshots, caps, and pre-restore backups
+10. `runner-tests.test.js` — Code compilation, stdin, and shared test suites
+11. `oauth-password.test.js` — OAuth state/PKCE and password reset flows
+12. `aiReview.test.js` — AI review service, prompts, redaction, and endpoints
+13. `persistence.test.js` — Mongo append-only update log, compaction, and ordering
+14. `redis-scaleout.test.js` — Multi-instance socket synchronization and replica pub/sub
+15. `production-readiness.test.js` — Health probes (`/healthz`, `/readyz`), metrics, shutdown
 
-1. **Invite & Join Flow:** Owner creates workspace and generates an Editor invite. Editor opens `/invite/:token`, logs in, accepts, and enters the room.
-2. **Viewer Restrictions:** Owner generates a Viewer invite. Viewer joins: typing is blocked, but commenting and pressing Run works.
-3. **Multiplayer Typing & Presence:** All 3 participants see each other's avatars in the presence bar and live Monaco cursors.
-4. **Dynamic Role Transitions:** Owner updates Viewer to Editor via ShareDialog People tab. The collaborator can now edit code immediately without a page refresh.
-5. **Live Removal:** Owner removes a member. The removed user's screen immediately transitions to the access revoked state.
-6. **Security & Secrecy:** Non-members attempting to access `/room/:roomId` receive a 404 (preventing room existence leaking).
-7. **Version Restore & Diff:** Editor saves a version, alters code, opens DiffView to compare against Current, and restores past version. A pre-restore backup is auto-saved.
-8. **Isolated Undo:** Owner and Editor type concurrently. Pressing Ctrl+Z only undoes the local user's keystrokes.
-9. **Runner & Test Cases:** Run code with stdin; add test cases, run all sequentially, and view pass/fail diffs.
-10. **Rate Limiting:** Repeated failed login attempts (11+) from an IP return 429 Too Many Requests with a `Retry-After` header.
-11. **Persistence Resilience:** Restarting the backend node process preserves all Yjs doc states and snapshots.
-12. **Responsive Design & Themes:** Test light and dark themes on both desktop and mobile viewports.
+### Frontend Test Suite (Vitest)
+```bash
+npm --prefix frontend test -- --run
+```
+*Runs all 12 frontend test suites with 57 tests:*
+1. `permissions.test.js` — Role and permission evaluation
+2. `auth.test.jsx` — Authentication flows and session refresh
+3. `undo.test.js` — Collaborative undo/redo isolation
+4. `ConsoleDrawer.test.jsx` — Multi-tab console runner and test execution
+5. `SnapshotsDiff.test.jsx` — Snapshot history and Monaco DiffEditor integration
+6. `ShareDialog.test.jsx` — Member list, invite link creation, and role toggling
+7. `HomeFilters.test.jsx` — Workspace filtering and search
+8. `LandingNavigation.test.jsx` — Public landing page routes
+9. `ScreenRendering.test.jsx` — Core layout and view rendering
+10. `comment-editing.test.jsx` — In-place comment editing and mention picker keyboard navigation
+11. `notifications.test.jsx` — Bell badge counter, real-time push, dropdown list
+12. `ai-review.test.jsx` — AI review panel, glyph display, and comment conversion
+
+### Frontend Production Build
+```bash
+npm --prefix frontend run build
+```
+*Compiles optimized production assets to `frontend/dist/` in under 2 seconds.*
+
+### Automated Deployment Smoke Test
+```bash
+API_URL="http://localhost:5000" node scripts/smoke.mjs
+```
+*Performs end-to-end integration verification against running server.*
+
+### Multi-Room Concurrent Load Test
+```bash
+npm --prefix backend run loadtest
+```
+*Executes concurrent WebSocket benchmark simulating 20 users across 5 rooms.*
+
+---
+
+## 7. Phase 4 Deviations & Design Notes
+
+1. **Free Cloud Deployment Without Custom Domain:**
+   - In accordance with the user's explicit instruction, deployment does not require purchasing a custom domain.
+   - The frontend deploys on Vercel (`https://*.vercel.app`) and the backend on Render (`https://*.onrender.com`).
+   - Cross-site cookies are supported via `COOKIE_SAMESITE=none` and `secure: true`.
+2. **Optional Redis Scale-Out:**
+   - To preserve maximum simplicity and zero-cost local development, Redis is fully optional.
+   - When `REDIS_URL` is omitted, the platform uses an in-process document store with durable MongoDB logging, passing all test suites.
+   - When `REDIS_URL` is provided (e.g., free Upstash Redis), multi-replica clustering and distributed socket broadcasting activate automatically.
+3. **Pluggable AI Providers:**
+   - Supports both Google Gemini and OpenAI with a uniform prompt structure and secret scrubber.
+   - Provides an in-memory mock reviewer when API keys are absent, ensuring development and testing are never blocked.
+
+---
+
+## 8. Release Checklist
+
+- [x] All 15 backend test suites green (`npm --prefix backend test`, 119/119 passing).
+- [x] All 12 frontend test suites green (`npm --prefix frontend test -- --run`, 57/57 passing).
+- [x] Production build passes cleanly with 0 errors (`npm --prefix frontend run build`).
+- [x] Concurrent load test verified (`npm --prefix backend run loadtest`, 0 errors, 0 convergence issues).
+- [x] Multi-stage Docker container build verified (`backend/Dockerfile`).
+- [x] Docker Compose multi-instance profile verified (`docker-compose.yml`).
+- [x] All 26 environment variables documented in `.env.example` (`node scripts/check-env-example.js`).
+- [x] Zero-cost cloud deployment guide documented in `docs/DEPLOYMENT.md`.
+- [x] Security review covering all 14 criteria documented in `docs/SECURITY.md`.
+- [x] Authentic performance metrics documented in `docs/PERFORMANCE.md`.
+- [x] Complete RBAC matrix documented in `docs/PERMISSIONS.md`.
+- [x] Automated smoke test script verified (`scripts/smoke.mjs`).
+- [x] Database index sync script created and tested (`backend/scripts/ensure-indexes.js`).
+
+---
+
+## 9. Phase 5 Backlog (Future Roadmap)
+
+1. **Organizations & Teams:**
+   - Multi-tenant workspaces with organization hierarchies, billing administrators, and team-level invite codes.
+2. **Self-Hosted Code Runner:**
+   - Isolated Docker container / Firecracker microVM execution workers replacing external Wandbox dependency for lower latency and offline capability.
+3. **Threaded Comment Reactions & Pinning:**
+   - Emoji reactions on comments and line replies, with thread pinning to prioritize unresolved discussions.
+4. **Offline-First Editing & Sync:**
+   - Local CRDT persistence via IndexedDB enabling offline code editing with automatic sync upon reconnecting.
+5. **Public Read-Only Workspace Links:**
+   - Shareable view-only URLs with optional password protection for code presentations and interviews.
+6. **Workspace Analytics & Audit Logs:**
+   - Detailed timeline of member activities, edit session durations, AI review utilization, and exportable audit logs for enterprise compliance.

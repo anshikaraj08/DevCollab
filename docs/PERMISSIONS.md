@@ -2,7 +2,7 @@
 
 DevCollab enforces role-based access control (RBAC) across three membership roles for workspaces:
 - **Owner (`owner`)**: Workspace creator or transferred owner. Has complete authority over workspace settings, membership, invites, code execution, snapshots, and deletion.
-- **Editor (`editor`)**: Collaborator with write access to code, comments, snapshots, and tests.
+- **Editor (`editor`)**: Collaborator with write access to code, comments, snapshots, AI reviews, and shared tests.
 - **Viewer (`viewer`)**: Read-only collaborator. Can inspect code, see live cursors, run code and test cases, post comments, and compare snapshots in the non-destructive diff editor, but cannot modify code, save snapshots, edit tests, or alter membership.
 
 ---
@@ -41,3 +41,11 @@ In addition to HTTP middleware (`roomAccess`), the Socket.IO and Yjs collaborati
 3. **Collaborative Undo Isolation:** `Y.UndoManager` scopes undo/redo exclusively to the local editor's origin. Viewers do not have undo stacks. When a snapshot restore occurs (`room:restored`), undo history is cleared across all participants to prevent re-inserting pre-restore contents.
 4. **Concurrent Connection Limits:** Each authenticated user is limited to 10 concurrent real-time sockets across rooms. Excess connections are rejected with `TOO_MANY`.
 
+---
+
+## 3. Distributed Scale-Out & Notification RBAC (Phase 4)
+
+1. **Redis Pub/Sub Consistency:** In multi-instance deployments (`@socket.io/redis-adapter`), room broadcasts (`yjs:update`, `awareness:update`, `comment:*`, `room:restored`) travel through Redis channels. Each backend instance enforces the role matrix locally on connected sockets before emitting or accepting mutations.
+2. **Private User Channels:** In-app notifications are routed strictly through private socket channels (`user:<userId>`). Other users in the same workspace room cannot subscribe to or intercept notifications intended for peers.
+3. **Mention Authorization:** The backend verifies that mentioned user handles correspond to active workspace members before generating notifications or dispatching email alerts.
+4. **Account Safety Guards:** Users cannot unlink their last remaining authentication method (e.g. unlinking password when no OAuth account is linked), preventing orphaned user accounts.

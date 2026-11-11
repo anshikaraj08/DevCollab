@@ -229,7 +229,11 @@ export function createSocketServer(httpServer, deps) {
       } catch {
         return socket.emit("room:error", { roomId, error: "BAD_UPDATE" });
       }
-      socket.to(roomKey(roomId)).emit("yjs:update", { roomId, update });
+      socket.to(roomKey(roomId)).emit("yjs:update", {
+        roomId,
+        update,
+        sentAt: payload?.sentAt,
+      });
     });
 
     // 4) Cursor and presence
@@ -246,7 +250,11 @@ export function createSocketServer(httpServer, deps) {
       socket.data.awareness = socket.data.awareness || {};
       socket.data.awareness[roomId] = { clientId, update };
 
-      socket.to(roomKey(roomId)).emit("awareness:update", { roomId, update });
+      socket.to(roomKey(roomId)).emit("awareness:update", {
+        roomId,
+        update,
+        sentAt: payload?.sentAt,
+      });
     });
 
     socket.on("disconnect", () => {
