@@ -71,5 +71,5 @@ jobs:
       - name: Build backend Docker image and load its modules
         run: |
           docker build -t devcollab-backend-ci backend
-          docker run --rm -e NODE_ENV=test devcollab-backend-ci node --input-type=module -e "await import('./app.js'); await import('./sockets/createSocketServer.js'); await import('./services/digest.service.js'); console.log('image modules ok'); process.exit(0)"
+          docker run --rm -e NODE_ENV=production -e MONGO_URI=mongodb://127.0.0.1:1/unused -e JWT_ACCESS_SECRET=ci-image-check-secret-at-least-32-characters devcollab-backend-ci node --input-type=module -e "await import('./app.js'); await import('./sockets/createSocketServer.js'); await import('./services/digest.service.js'); console.log('image modules ok'); process.exit(0)"
 
