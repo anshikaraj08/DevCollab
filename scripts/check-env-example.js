@@ -14,6 +14,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
+const LEGACY_VARS = new Set(["JWT_REFRESH_SECRET"]);
+
 function parseEnvKeys(filePath) {
   if (!fs.existsSync(filePath)) return new Set();
   const content = fs.readFileSync(filePath, "utf8");
@@ -49,8 +51,11 @@ function findReferencedEnvVars() {
   vars.add("NODE_ENV");
   vars.add("MONGO_URI");
   vars.add("JWT_ACCESS_SECRET");
-  vars.add("JWT_REFRESH_SECRET");
   vars.add("CLIENT_URL");
+
+  // Legacy keys: still accepted by env.js so old deployments boot, but unused
+  // and intentionally not documented as settings in .env.example.
+  for (const legacy of LEGACY_VARS) vars.delete(legacy);
 
   return vars;
 }

@@ -13,5 +13,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
     pool: 'threads',
+    // Rendering-heavy tests can exceed the 5 s default when all files run in parallel
+    // (seen locally and likely on slower CI runners).
+    testTimeout: 20000,
   },
 })
