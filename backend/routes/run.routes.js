@@ -8,7 +8,7 @@ import { RATE_LIMITS } from "../config/limits.js";
 
 const runRateLimiter = createRateLimiter({
   ...RATE_LIMITS.run,
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyType: "user",
 });
 
 const router = Router();

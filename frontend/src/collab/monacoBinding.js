@@ -48,16 +48,20 @@ export class MonacoBinding {
     this.undoManager = new Y.UndoManager(this.ytext, {
       trackedOrigins: new Set([this]),
     });
-    this.onStackChange = null;
+    this.stackListeners = new Set();
     const emitStackChange = () => {
-      this.onStackChange?.({
-        canUndo: this.canUndo(),
-        canRedo: this.canRedo(),
-      });
+      const state = { canUndo: this.canUndo(), canRedo: this.canRedo() };
+      for (const fn of this.stackListeners) fn(state);
     };
     this.undoManager.on("stack-item-added", emitStackChange);
     this.undoManager.on("stack-item-popped", emitStackChange);
     this.undoManager.on("stack-cleared", emitStackChange);
+  }
+
+  /** Listen for undo/redo availability changes. Returns an unsubscribe function. */
+  subscribeStack(fn) {
+    this.stackListeners.add(fn);
+    return () => this.stackListeners.delete(fn);
   }
 
   undo() {

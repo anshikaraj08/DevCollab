@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { escapeHtml } from "../utils/escapeHtml.js";
 import Lease from "../models/lease.model.js";
 import User from "../models/user.model.js";
 import Room from "../models/room.model.js";
@@ -93,13 +94,13 @@ export async function sendDigestEmail({ to, name, notifications, unsubscribeToke
           : n.type === "reply"
           ? "replied to your comment thread"
           : "accepted your room invite";
-      return `<li style="margin-bottom: 8px;"><strong>${actorName}</strong> ${actionDesc} in <em>${roomTitle}</em></li>`;
+      return `<li style="margin-bottom: 8px;"><strong>${escapeHtml(actorName)}</strong> ${escapeHtml(actionDesc)} in <em>${escapeHtml(roomTitle)}</em></li>`;
     })
     .join("");
 
   const html = `<div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; color: #1e293b;">
     <h2 style="color: #0f172a;">DevCollab Notification Digest</h2>
-    <p>Hi ${name || "there"},</p>
+    <p>Hi ${escapeHtml(name || "there")},</p>
     <p>You have ${count} unread notification${count === 1 ? "" : "s"} waiting for you:</p>
     <ul style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 24px;">
       ${itemsHtml}

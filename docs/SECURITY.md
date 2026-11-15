@@ -1,166 +1,183 @@
-# DevCollab — Security Review & Threat Model Audit
+# DevCollab — Security Model
 
-> **Review Date:** November 7, 2026  
-> **Status:** Passed across all 14 security criteria  
-> **Target Environment:** Free-tier multi-subdomain cloud deployment (Render + Vercel + MongoDB Atlas + Upstash Redis)
-
----
-
-## 1. Authentication & Authorization
-
-### Session & Token Architecture
-* **Access Tokens:** Signed with HMAC-SHA256 (`JWT_ACCESS_SECRET`), 15-minute lifespan. Transmitted via `Authorization: Bearer <token>` in HTTP headers and `socket.handshake.auth.token` in WebSockets. Never stored in `localStorage` or `sessionStorage`.
-* **Refresh Tokens:** Cryptographically random (64 hex characters), 7-day lifespan. Stored as SHA-256 hashes in MongoDB (`User.refreshTokens.tokenHash`). Delivered exclusively via `HttpOnly`, `SameSite=None` (or `Lax`), `Secure` cookies scoped to path `/api/v1/users`.
-* **Token Rotation & Invalidation:** Every refresh generates a new refresh token and deletes the old one. Logging out revokes the specific token from the database. Password resets revoke all active refresh tokens for the user.
-
-### Role-Based Access Control (RBAC)
-* **HTTP Route Enforcement:**
-  * Workspace routes (`/rooms/:id/*`, `/comments/*`, `/snapshots/*`, `/ai/*`, `/tests/*`) pass through `protect` and `roomAccess` middleware.
-  * Roles (`owner`, `editor`, `viewer`) are validated strictly per operation (see [`docs/PERMISSIONS.md`](file:///c:/All%20Projects/DevCollab/docs/PERMISSIONS.md)).
-  * Non-members receive `404 Not Found` (preventing workspace existence enumeration).
-* **Socket.IO Event Enforcement:**
-  * Sockets authenticate in the connection handshake via `verifyToken`.
-  * `room:join` verifies membership in MongoDB before admitting the socket.
-  * Sockets with role `viewer` sending `yjs:update` are blocked and receive `{ error: "READ_ONLY" }`.
-  * Sockets are limited to a maximum of 10 concurrent connections per user.
+> **Last reviewed:** November 15, 2026, against the code on branch `phase-4`.
+> **Target environment:** Render (backend) + Vercel (frontend) + MongoDB Atlas, optionally Upstash Redis.
+>
+> This document describes what the code does today. Where a control has a known limit, the limit is stated next to it.
 
 ---
 
-## 2. Token Handling & Cookie Attributes
+## 1. Authentication & Sessions
 
-| Attribute | Value | Security Justification |
+### Access tokens
+* JWT signed with HMAC-SHA256 (`JWT_ACCESS_SECRET`), **15-minute** lifetime, payload `{ id, email }`.
+* Sent as `Authorization: Bearer <token>` on HTTP requests and as `socket.handshake.auth.token` on Socket.IO.
+* Kept in memory in the browser only (`frontend/src/config/axios.js`), never in `localStorage` / `sessionStorage`.
+* **Limit:** access tokens are stateless. After logout, password change or "log out everywhere", an already-issued access token keeps working until it expires (at most 15 minutes).
+
+### Refresh tokens (server-side sessions)
+Implemented in `backend/utils/sessions.js` and `backend/models/session.model.js`.
+* The refresh token is an **opaque random value** (32 bytes, hex). The database stores only its **SHA-256 hash**, one `Session` document per signed-in device, with a 7-day expiry (MongoDB TTL index).
+* **Rotation:** every call to `/users/refresh` marks the presented session as replaced and issues a new token. Two refreshes with the same token within **30 seconds** (two tabs, or the HTTP client and the socket client racing) both succeed; only the first rotates.
+* **Reuse detection:** presenting an already-replaced token after that grace window is treated as theft and **revokes every session of that user**.
+* **Logout** deletes the current session. **Log out everywhere**, **password reset**, **password change** and **provider unlink** delete all sessions (password change and unlink then start a fresh session on the current device).
+* `JWT_REFRESH_SECRET` is no longer used. It is still accepted (and must be ≥ 32 characters if set) so older deployments keep booting.
+
+### Refresh cookie attributes
+| Attribute | Value |
+|---|---|
+| `HttpOnly` | `true` |
+| `Secure` | `true` when `NODE_ENV=production` |
+| `SameSite` | `COOKIE_SAMESITE` if set; otherwise `none` in production (required for `*.vercel.app` → `*.onrender.com`), `lax` in development |
+| `Path` | `/` |
+| `Domain` | `COOKIE_DOMAIN` if set (production only) |
+
+Tokens are never placed in URLs. OAuth redirects back to the frontend carry only `next` / `error` query parameters; the frontend then calls `/users/refresh` to obtain an access token.
+
+---
+
+## 2. Authorization (RBAC)
+
+* Roles: `owner`, `editor`, `viewer` — matrix in [`PERMISSIONS.md`](./PERMISSIONS.md), single source in `backend/utils/roles.js` (mirrored in `frontend/src/lib/permissions.js`).
+* HTTP: room-scoped routes use `authUser` + `roomAccess(action)` middleware. Comment routes addressed by comment id (`/comments/:commentId/...`) resolve the room from the comment and check the role in the controller.
+* Non-members get **404 Room not found** for room-scoped routes, so room existence is not revealed.
+* Sockets: the handshake verifies the access token; `room:join` re-checks membership in MongoDB; viewers sending `yjs:update` receive `{ error: "READ_ONLY" }`.
+* **Live role changes:** when an owner changes a role or removes a member, `io.syncRoomMembership(roomId)` re-checks every connected socket in the room. With Redis configured, the request is fanned out to every instance (`serverSideEmit`) and each instance updates its *own* sockets, so a demoted or removed user loses write access on every server immediately.
+* **Room deletion** disconnects all live sockets in the room on every instance, unloads the in-memory document, and deletes the room's invites, comments, snapshots, update log, AI reviews and notifications.
+
+---
+
+## 3. CORS
+
+* Express and Socket.IO both check the `Origin` header against `CLIENT_URLS` (comma-separated; falls back to `CLIENT_URL`). Trailing slashes are ignored on both sides.
+* `credentials: true` so the refresh cookie is sent.
+* Requests **without** an `Origin` header (curl, server-to-server) are allowed; they cannot carry a victim's cookies from a browser context.
+* A disallowed origin gets `403 CORS origin denied`.
+
+---
+
+## 4. Security Headers & Content Security Policy
+
+**Backend API** — `helmet` defaults (including its default CSP, `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, HSTS) with `Cross-Origin-Resource-Policy: cross-origin` so the Vercel frontend can read responses.
+
+**Frontend** — set by `frontend/vercel.json` (production) and `frontend/nginx.conf` (Docker):
+
+| Directive | Value | Why |
 |---|---|---|
-| `HttpOnly` | `true` | Prevents JavaScript and XSS extraction of refresh tokens. |
-| `Secure` | `true` in production | Transmitted strictly over encrypted TLS connections (Render and Vercel HTTPS). |
-| `SameSite` | `none` (cross-site) or `lax` (same-origin) | Configurable via `COOKIE_SAMESITE`. `none` is strictly required for cross-domain free subdomains (`*.vercel.app` calling `*.onrender.com`). |
-| `Path` | `/api/v1/users` | Minimizes cookie transmission surface to auth-related endpoints only. |
-| URL Tokens | None | Tokens are never placed in URL query parameters, preventing leakage through browser history, referer headers, and proxy logs. |
+| `default-src` | `'self'` | |
+| `script-src` | `'self'` | No inline scripts. The theme bootstrap lives in `public/theme-init.js`; Monaco is self-hosted under `/monaco` (production builds default to it). |
+| `style-src` | `'self' 'unsafe-inline' https://fonts.googleapis.com` | Monaco and Tailwind inject inline styles; Google Fonts stylesheet |
+| `font-src` | `'self' data: https://fonts.gstatic.com` | Google Fonts files |
+| `worker-src` | `'self' blob:` | Monaco web workers |
+| `connect-src` | `'self' https: wss:` (Vercel) / adds `http: ws:` (local Docker) | API and WebSocket on a different origin chosen at deploy time |
+| `img-src` | `'self' data: https:` | OAuth avatars |
+| `frame-ancestors` | `'none'` | Clickjacking |
+
+Also: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
 
 ---
 
-## 3. Cross-Origin Resource Sharing (CORS)
+## 5. Rate Limiting
 
-* **Origin Whitelisting:** Express CORS middleware dynamically inspects incoming `Origin` headers against `CLIENT_URLS` (comma-separated list, e.g. `https://devcollab.vercel.app`).
-* **Trailing Slash Normalization:** Both incoming origins and allowed origins are trimmed and stripped of trailing slashes before comparison.
-* **Credentials:** `credentials: true` is strictly enforced to allow cookie-based refresh and authentication handshakes. Untrusted origins receive `403 CORS origin denied`.
+Values are from `backend/config/limits.js` and `backend/middleware/rateLimit.middleware.js`.
 
----
+| Operation | Limit | Keyed by |
+|---|---|---|
+| `POST /users/register` + `POST /users/login` | 10 / 15 min, one shared counter for both | client IP |
+| `POST /users/forgot-password` | 5 / hour | client IP + email |
+| `POST /users/reset-password` | 10 / hour | client IP |
+| `POST /users/verify-email/request` | 5 / hour | user |
+| `GET /auth/:provider`, `/auth/:provider/callback` | 30 / 15 min | client IP |
+| `POST /run` | 30 / min | user |
+| Snapshot create / restore | 20 / hour | user |
+| Invite create | 20 / hour | user |
+| Invite preview / accept | 20 / hour | client IP |
+| Comment edit | 30 / min | user |
+| `/notifications/*` | 120 / min | user |
+| AI review | 5 / hour per user, 20 / day per room, plus `AI_DAILY_REQUEST_LIMIT` (default 100) per server per day | user / room |
+| Socket events (`yjs:update`, `awareness:update`) | 120 / second per socket | socket |
+| Concurrent sockets | 10 per user **per instance** | user |
 
-## 4. Content Security Policy (CSP) & Security Headers
-
-Configured via `helmet`:
-* `default-src 'self'`: Restricts resource loading to origin by default.
-* `script-src 'self'`: Script execution restricted to own origin; Monaco editor workers loaded via dedicated blob/web worker protocols.
-* `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`: Permits Monaco's dynamic syntax token coloring and Inter/JetBrains Mono web fonts.
-* `font-src 'self' https://fonts.gstatic.com`: Loads Google Fonts securely.
-* `connect-src 'self' https://* wss://*`: Permits API calls, Sentry error telemetry, and WebSocket transports.
-* `worker-src 'self' blob:`: Required for Monaco Editor background syntax validation web workers.
-* Additional Headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`.
-
----
-
-## 5. Rate Limiting & Abuse Prevention
-
-| Endpoint / Operation | Rate Limit | Storage Backend | Action on Violation |
-|---|---|---|---|
-| Global API (`/api/v1/*`) | 100 req / 15 min | Redis / In-Memory | `429 Too Many Requests` |
-| Login (`/users/login`) | 5 req / min | Redis / In-Memory | `429 Too Many Requests` |
-| Registration (`/users/register`) | 3 req / hour | Redis / In-Memory | `429 Too Many Requests` |
-| Password Reset Request | 3 req / hour | Redis / In-Memory | `429 Too Many Requests` |
-| Code Execution (`/run`) | 10 req / min | Redis / In-Memory | `429 Too Many Requests` |
-| AI Code Review (`/ai/review`) | 10 req / hour (user)<br>5 req / day (room) | Redis / In-Memory | `429 Too Many Requests` |
-| Socket Inbound Events | 120 events / sec | Socket.IO local window | `{ error: "RATE_LIMIT" }` |
-
-When `REDIS_URL` is configured, rate limit counters are shared across all backend replicas using `rate-limit-redis`.
+* **Client IP** is `req.ip`, which Express derives using the `trust proxy` setting. Set `TRUST_PROXY=1` on Render (one proxy hop). The client-controlled part of `X-Forwarded-For` is ignored, so rotating that header does not create new buckets. IPv6 addresses are grouped by /56.
+* If `TRUST_PROXY` is unset in production, every client appears to come from the proxy's IP and shares one bucket; the server logs a warning at startup.
+* With `REDIS_URL` set, all HTTP rate-limit counters live in Redis and are shared across instances. Without Redis they are per process. The per-user socket cap is always per instance.
+* There is **no global API rate limit** across all routes.
 
 ---
 
-## 6. Input Validation & Defense-in-Depth
+## 6. Input Validation
 
-* **Zod Schemas:** Every incoming JSON request body is validated against strict Zod schemas before reaching business logic (e.g. `registerSchema`, `loginSchema`, `commentSchema`, `createRoomSchema`).
-* **ID Format Validation:** MongoDB ObjectIds are strictly regex-validated (`/^[a-f\d]{24}$/i`). Invalid IDs reject with `400 Bad Request` or `404 Not Found` without reaching Mongoose casting errors.
-* **Socket Payload Limits:** Maximum allowed size for a single Yjs collaborative update is **512 KB** (`MAX_UPDATE_BYTES = 524288`). Oversized payloads are immediately rejected.
-* **Code Size Limits:** Code submitted for execution or AI review is bounded to **20,000 characters**.
-
----
-
-## 7. Output Encoding & Injection Protections
-
-* **Comments & Mentions:** User comments are stored and returned as plain text. The frontend React component renders comments through safe text nodes and highlighted mention pills with zero raw `dangerouslySetInnerHTML`.
-* **AI Code Review Prompt Injection Defense:**
-  * User code is treated strictly as data, wrapped in unambiguous delimiters (`--- BEGIN CODE ---` and `--- END CODE ---`).
-  * System instructions explicitly instruct Gemini to output structured JSON findings and never execute tool calls or interpret code as instructions.
-  * Secret scanning regex (`AI_SECRET_PATTERNS`) automatically scrubs API keys (e.g. `AIza...`, `ghp_...`, `sk-...`, AWS keys) before code is transmitted to external AI providers.
+* Zod schemas validate request bodies for register, login, room create, code save, run, snapshots and test cases (`backend/validators/`). Other handlers validate fields explicitly in the controller.
+* `req.body` defaults to `{}` when no JSON body is sent, so body-less requests get a 4xx, not a 500.
+* Room ids are checked against `/^[a-f\d]{24}$/i` before querying; invalid ids get 404.
+* Size limits: single Yjs update ≤ 512 KB; awareness update ≤ 4 KB; Socket.IO message ≤ 1 MB; code for `/run` ≤ 200,000 characters, stdin ≤ 10,000; code sent to AI review ≤ 20,000 characters; snapshot code ≤ 200,000 characters.
+* Passwords for register / reset / change: 6–128 characters with upper, lower, digit and symbol. Hashed with **bcrypt, cost 10**.
 
 ---
 
-## 8. Secrets Handling & Infrastructure Hardening
+## 7. Output Encoding & Injection
 
-* **No Hardcoded Secrets:** Zero API keys, database credentials, or signing secrets exist in the git repository.
-* **Docker Security:** `.dockerignore` excludes all `.env*` files, git metadata, and local development logs. Docker images run under non-root users where supported.
-* **CI Secrets:** GitHub Actions CI builds consume secrets strictly through GitHub Repository Secrets.
-* **Logging Redaction:** Pino HTTP logger (`backend/utils/logger.js`) automatically redacts sensitive headers and payload fields:
-  * `req.headers.authorization`
-  * `req.headers.cookie`
-  * `password`
-  * `newPassword`
-  * `token`
+* Comments are stored and returned as plain text and rendered by React as text nodes (no `dangerouslySetInnerHTML`).
+* Email bodies (verification, reset, password-changed, digest) HTML-escape every user-controlled value (names, room titles) via `backend/utils/escapeHtml.js`.
+* AI review: code is redacted for common secret formats before it leaves the server (`backend/utils/secretRedactor.js`), wrapped in explicit delimiters, and the model output is parsed and validated against a schema before it is stored or shown.
 
 ---
 
-## 9. Dependency Vulnerability Audit (`npm audit`)
+## 8. OAuth (Google, GitHub)
 
-### Backend Audit Status
-* **Production Dependencies:** **0 vulnerabilities** (`npm audit` clean on production dependencies).
-* **Development Dependencies:** 1 moderate advisory in `minimatch` (via `nodemon` dev dependency for glob matching). Non-exploitable in production runtime as dev dependencies are excluded from production container builds.
-
-### Frontend Audit Status
-* **Production Dependencies:**
-  * `monaco-editor@0.57.0` bundles internal `dompurify` for editor tooltip markdown formatting. DevCollab disables HTML rendering in Monaco hover providers (`allowHtml: false`), mitigating DOM XSS risks.
-* **Development Dependencies:** 1 moderate advisory in `minimatch` (via `eslint` dev dependency). Excluded from production static build output.
-
----
-
-## 10. OAuth State, PKCE & Account Takeover Prevention
-
-* **Arctic Library Integration:** OAuth 2.0 flows for Google and GitHub utilize cryptographic state tokens and PKCE code verifiers stored in temporary `HttpOnly` cookies.
-* **Unverified Account Takeover Protection:** When an OAuth login returns an email that matches an existing local account, DevCollab **never** links automatically unless the existing account's email is already verified. Unverified accounts reject with an explicit verification requirement to prevent pre-hijacking attacks.
+* State and PKCE verifier are stored in a signed, `HttpOnly`, 10-minute cookie and compared in constant time on callback (library: `arctic`).
+* Only provider identities with a **verified email** are accepted.
+* Account matching rules (`backend/controllers/oauth.controller.js`):
+  1. Provider identity already linked → sign in to that account.
+  2. No account with that email → create a verified, password-less account.
+  3. Account with that email exists and **is verified** → link the provider and sign in.
+  4. Account with that email exists but **is not verified** → the OAuth user proves ownership of the email, so the existing password is **removed**, all sessions of that account are revoked, the email is marked verified, and the provider is linked. This defeats "pre-hijacking", where an attacker registers someone else's email with a password before the real owner signs in with Google/GitHub.
+  5. Link requests while signed in: refused if the provider identity already belongs to another user.
+* A user cannot unlink their last remaining sign-in method.
 
 ---
 
-## 11. Password Reset & Verification Security
+## 9. Account Enumeration
 
-* **Cryptographic Entropy:** Reset tokens are generated using Node.js `crypto.randomBytes(32).toString("hex")`.
-* **Storage Hashing:** The database stores only the SHA-256 hash of the reset token, preventing compromised database dumps from being used to reset passwords.
-* **Time Expiration:** Reset tokens expire after **1 hour**; email verification tokens expire after **24 hours**.
-* **Single-Use Invalidation:** Upon successful password reset, the reset token fields are cleared, the user's password is encrypted with `bcrypt` (12 salt rounds), and all active refresh tokens are revoked.
-
----
-
-## 12. Account Enumeration Protection
-
-* **Timing-Safe Responses:**
-  * `POST /users/login`: Returns generic `401 Unauthorized` ("Invalid email or password") for both non-existent users and incorrect passwords.
-  * `POST /users/forgot-password`: Always returns `200 OK` ("If an account with that email exists, a reset link has been sent") regardless of whether the email is registered.
+* `POST /users/login` returns the same `401 Invalid email or password` for unknown emails, OAuth-only accounts and wrong passwords, and runs a bcrypt comparison in every case so response time does not reveal which.
+* `POST /users/forgot-password` always returns `202` with the same message.
+* **Limit:** `POST /users/register` returns `409 Email already registered` for an existing email. This is a deliberate usability trade-off; registration is rate limited per IP.
 
 ---
 
-## 13. Summary Compliance Table
+## 10. Password Reset & Email Verification
 
-| Security Check | Implementation | Status |
-|---|---|:---:|
-| Authentication on all endpoints & sockets | JWT Access (15m) + Cookie Refresh (7d) | Passed |
-| RBAC on all routes & actions | Owner / Editor / Viewer matrix enforced | Passed |
-| Token security | In-memory access, HttpOnly refresh | Passed |
-| Cross-site cookie compatibility | `SameSite=None; Secure=true` | Passed |
-| Dynamic CORS origin whitelist | Matches `CLIENT_URLS` without trailing slashes | Passed |
-| Helmet Content Security Policy | Strict source policies, Monaco worker support | Passed |
-| Tiered Rate Limiting | Route-specific + socket 120/s burst limiter | Passed |
-| Input validation | Zod schemas + ObjectId regex validation | Passed |
-| Output encoding | Plaintext React rendering, no raw HTML | Passed |
-| AI Prompt Injection & Data Privacy | Code as data, automated secret scrubbing | Passed |
-| Docker & CI secrets isolation | `.dockerignore`, zero committed secrets | Passed |
-| OAuth PKCE & Account Takeover Defense | Arctic PKCE, verified-only linking | Passed |
-| Password reset single-use & hashing | SHA-256 token hash, bcrypt-12 passwords | Passed |
-| Sensitive log redaction | Pino header & payload redaction rules | Passed |
+* Tokens: `crypto.randomBytes(32)` (hex). Only the SHA-256 hash is stored (`AuthToken` collection, TTL index).
+* Reset tokens expire after **1 hour**, verification tokens after **24 hours**; both are single-use and previous reset tokens are invalidated when a new one is requested.
+* A successful reset revokes every session of the account and sends a "password changed" notice.
+* **Email delivery requires** `MAIL_TRANSPORT=smtp` and `SMTP_URL`. Otherwise emails are only written to the log (and a warning is logged in production).
 
+---
+
+## 11. Secrets, Logging & Infrastructure
+
+* No secrets are committed; `.env` files are git-ignored and excluded by `.dockerignore`.
+* Pino redacts `authorization` / `cookie` headers, `set-cookie`, and `password`, `token`, `accessToken`, `refreshToken` and `code` fields. **Limit:** failed logins log the attempted email address.
+* `/metrics` returns 404 unless `METRICS_TOKEN` is set, then requires `Authorization: Bearer <METRICS_TOKEN>`.
+* The backend container runs as the non-root `node` user.
+
+---
+
+## 12. Dependencies
+
+* `npm audit --omit=dev` reports **0 vulnerabilities** for both `backend` and `frontend` as of the review date.
+* The frontend pins `dompurify@3.4.18` through an npm `overrides` entry because `monaco-editor@0.57.0` (latest) depends on an older, vulnerable release.
+* CI runs `npm audit --omit=dev --audit-level=high` for both packages and fails the build on high or critical advisories.
+
+---
+
+## 13. Known Limitations
+
+| Area | Limitation |
+|---|---|
+| Access tokens | Remain valid up to 15 minutes after logout or revocation |
+| Refresh rotation | A refresh response lost in transit, followed by a retry with the old cookie more than 30 s later, is treated as token reuse and signs the user out everywhere |
+| Registration | Reveals whether an email is registered (409) |
+| Socket cap | 10 sockets per user is enforced per instance, not cluster-wide |
+| Logs | Failed login attempts log the email address |
+| Code execution | `/run` sends code to the public Wandbox service; do not run code containing secrets |

@@ -1,4 +1,6 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import PageLoader from "../components/PageLoader";
 import UserAuth from "../auth/UserAuth";
 import AppLayout from "../components/layout/AppLayout";
 import MarketingLayout from "../components/layout/MarketingLayout";
@@ -12,13 +14,17 @@ import ForgotPassword from "../screens/ForgotPassword";
 import ResetPassword from "../screens/ResetPassword";
 import VerifyEmail from "../screens/VerifyEmail";
 import AuthCallback from "../screens/AuthCallback";
-import Settings from "../screens/Settings";
-import Room from "../screens/Room";
 import Invite from "../screens/Invite";
+import UnsubscribeDigest from "../screens/UnsubscribeDigest";
+
+// Heavy screens load on demand: Room pulls in Monaco and Yjs.
+const Room = lazy(() => import("../screens/Room"));
+const Settings = lazy(() => import("../screens/Settings"));
 
 export default function AppRoutes() {
   return (
     <BrowserRouter>
+      <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* public pages that share the marketing navigation and footer */}
         <Route element={<MarketingLayout />}>
@@ -34,6 +40,7 @@ export default function AppRoutes() {
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/invite/:token" element={<Invite />} />
+        <Route path="/unsubscribe-digest" element={<UnsubscribeDigest />} />
 
         {/* logged-in pages that share the slim app bar */}
         <Route
@@ -59,6 +66,7 @@ export default function AppRoutes() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

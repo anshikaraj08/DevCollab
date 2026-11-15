@@ -30,8 +30,23 @@ const app = express();
 initSentry();
 
 // Reverse proxy configuration
-if (env?.TRUST_PROXY !== undefined && env?.TRUST_PROXY !== "") {
-  app.set("trust proxy", Number(env.TRUST_PROXY));
+// TRUST_PROXY accepts a hop count ("1"), "true"/"false", or an Express preset/subnet ("loopback").
+export function parseTrustProxy(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return undefined;
+  const raw = String(value).trim();
+  if (/^\d+$/.test(raw)) return Number(raw);
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  return raw;
+}
+
+const trustProxy = parseTrustProxy(env?.TRUST_PROXY ?? process.env.TRUST_PROXY);
+if (trustProxy !== undefined) {
+  app.set("trust proxy", trustProxy);
+} else if (process.env.NODE_ENV === "production") {
+  logger.warn(
+    "TRUST_PROXY is not set. Behind a reverse proxy (Render, Fly, Nginx) every client will share one rate-limit bucket; set TRUST_PROXY=1."
+  );
 }
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
@@ -66,6 +81,11 @@ app.use(
 );
 
 app.use(express.json());
+// Express 5 leaves req.body undefined when there is no JSON body; handlers destructure it.
+app.use((req, res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
 const cookieSecret =
   process.env.COOKIE_SECRET || process.env.JWT_ACCESS_SECRET || "devcollab-cookie-secret-key-32chars";
 app.use(cookieParser(cookieSecret));

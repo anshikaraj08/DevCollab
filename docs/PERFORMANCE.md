@@ -4,6 +4,8 @@
 > **Benchmark Suite:** `loadtest/run-loadtest.mjs`  
 > **Harness:** Direct multi-client collaborative simulation with Yjs CRDTs, Socket.IO v4, Redis Adapter, and MongoDB update-log persistence.  
 > **Integrity Guarantee:** All metrics reported below are directly measured from actual benchmark executions. No unmeasured claims are made.
+>
+> **Note (November 15, 2026):** these numbers were measured before the persistence changes of that date (order-independent compaction, write retries, resync overlap window). Re-run `npm --prefix backend run loadtest` and update this page before relying on them for capacity planning.
 
 ---
 

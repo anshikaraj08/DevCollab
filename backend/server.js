@@ -7,6 +7,7 @@ import logger from "./utils/logger.js";
 import env from "./config/env.js";
 import { initSockets } from "./sockets/index.js";
 import { initRedis, closeRedis } from "./config/redis.js";
+import { startDigestScheduler, stopDigestScheduler } from "./services/digest.service.js";
 
 const PORT = env?.PORT || process.env.PORT || 5000;
 const server = http.createServer(app);
@@ -24,6 +25,9 @@ app.set("store", store);
 
 connectDB().then(() => {
   server.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+  // Email digests for users who opted in. A MongoDB lease ensures only one
+  // instance sends per cycle when several replicas run.
+  startDigestScheduler();
 });
 
 let isShuttingDown = false;
@@ -42,6 +46,8 @@ export const shutdown = async (signal = "SIGTERM") => {
   forceExitTimer.unref?.();
 
   try {
+    stopDigestScheduler();
+
     // 1. Stop accepting new HTTP connections
     await new Promise((resolve) => server.close(resolve));
     logger.info("HTTP server closed to new connections");

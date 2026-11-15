@@ -2,6 +2,9 @@ import Room from "../models/room.model.js";
 import Invite from "../models/invite.model.js";
 import Comment from "../models/comment.model.js";
 import Snapshot from "../models/snapshot.model.js";
+import YUpdate from "../models/yUpdate.model.js";
+import AiReview from "../models/aiReview.model.js";
+import Notification from "../models/notification.model.js";
 import ApiError from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import logger from "../utils/logger.js";
@@ -68,11 +71,20 @@ export const saveCode = asyncHandler(async (req, res) => {
 
 export const deleteRoom = asyncHandler(async (req, res) => {
   const roomId = req.room._id;
+
+  // Remove the room first so no new member can join or edit it
+  await req.room.deleteOne();
+
+  // Disconnect live collaborators and unload the document on every instance
+  await req.app.get("io")?.closeRoom?.(String(roomId));
+
   await Promise.all([
-    req.room.deleteOne(),
     Invite.deleteMany({ room: roomId }),
     Comment.deleteMany({ roomId }),
     Snapshot.deleteMany({ room: roomId }),
+    YUpdate.deleteMany({ room: roomId }),
+    AiReview.deleteMany({ room: roomId }),
+    Notification.deleteMany({ room: roomId }),
   ]);
   logger.info({ roomId, userId: req.user.id }, "Room and associated data deleted");
   res.json({ message: "Room deleted" });

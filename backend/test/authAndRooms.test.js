@@ -10,6 +10,8 @@ describe("Auth and Rooms Route Coverage", () => {
 
   before(async () => {
     db = await setupTestDb();
+    // Production runs behind one trusted proxy hop (TRUST_PROXY=1 on Render).
+    app.set("trust proxy", 1);
   });
 
   after(async () => {

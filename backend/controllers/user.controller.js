@@ -1,18 +1,26 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 import AuthToken from "../models/authToken.model.js";
 import ApiError from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import logger from "../utils/logger.js";
-import { setRefreshCookie, clearRefreshCookie } from "../utils/cookies.js";
+import { clearRefreshCookie, setRefreshCookie } from "../utils/cookies.js";
+import {
+  issueSession,
+  rotateSession,
+  revokeSession,
+  revokeAllSessions,
+} from "../utils/sessions.js";
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendPasswordChangedNotice,
 } from "../services/mailer.js";
 import { passwordSchema } from "../validators/user.validator.js";
+
+// bcrypt hash of a random string, used to equalize login timing for unknown emails
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString("hex"), 10);
 
 export const publicUser = (u) => ({
   _id: u._id,
@@ -25,8 +33,8 @@ export const publicUser = (u) => ({
   emailPrefs: u.emailPrefs || { digest: false },
 });
 
-const sendAuth = (res, user, status = 200) => {
-  setRefreshCookie(res, user.generateRefreshToken());
+const sendAuth = async (req, res, user, status = 200) => {
+  await issueSession(res, user, req);
   res.status(status).json({
     user: publicUser(user),
     accessToken: user.generateAccessToken(),
@@ -79,7 +87,7 @@ export const register = asyncHandler(async (req, res) => {
   });
 
   logger.info({ userId: user._id }, "User registered");
-  sendAuth(res, user, 201);
+  await sendAuth(req, res, user, 201);
 });
 
 /**
@@ -95,44 +103,49 @@ export const login = asyncHandler(async (req, res) => {
   const normalizedEmail = email.toLowerCase().trim();
   const user = await User.findOne({ email: normalizedEmail }).select("+password");
 
-  // If user does not exist or has no password (OAuth-only), return identical 401
-  if (!user || !user.password || !(await user.isValidPassword(password))) {
+  // If user does not exist or has no password (OAuth-only), return identical 401.
+  // Compare against a dummy hash so the response time does not reveal whether the email exists.
+  const passwordOk = user?.password
+    ? await user.isValidPassword(password)
+    : (await bcrypt.compare(password, DUMMY_PASSWORD_HASH), false);
+  if (!user || !passwordOk) {
     logger.warn({ email: normalizedEmail }, "Failed login attempt");
     throw new ApiError(401, "Invalid email or password");
   }
 
-  sendAuth(res, user);
+  await sendAuth(req, res, user);
 });
 
 /**
- * Silent session refresh
- * GET /users/refresh
+ * Silent session refresh. Rotates the refresh token on every call.
+ * GET|POST /users/refresh
  */
 export const refresh = asyncHandler(async (req, res) => {
   const token = req.cookies.refreshToken;
   if (!token) throw new ApiError(401, "No refresh token");
 
-  let decoded;
-  try {
-    decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-  } catch (err) {
+  const result = await rotateSession(token, req);
+
+  if (result.status === "invalid") {
     clearRefreshCookie(res);
     throw new ApiError(401, "Invalid or expired session token");
   }
+  if (result.status === "reused") {
+    logger.warn({ userId: result.userId }, "Refresh token reuse detected; all sessions revoked");
+    clearRefreshCookie(res);
+    throw new ApiError(401, "Session expired or revoked. Please sign in again.");
+  }
 
-  const user = await User.findById(decoded.id).select("+password");
+  const user = await User.findById(result.userId).select("+password");
   if (!user) {
     clearRefreshCookie(res);
     throw new ApiError(401, "User not found");
   }
 
-  // TokenVersion check: reject token if its version is older than user's current version
-  const tokenVer = decoded.tokenVersion ?? 0;
-  const userVer = user.tokenVersion ?? 0;
-  if (tokenVer < userVer) {
-    logger.warn({ userId: user._id, tokenVer, userVer }, "Rejected outdated refresh token version");
-    clearRefreshCookie(res);
-    throw new ApiError(401, "Session expired or revoked. Please sign in again.");
+  // "grace": a concurrent request already rotated this token and the browser has
+  // the new cookie, so only a fresh access token is returned here.
+  if (result.status === "rotated") {
+    setRefreshCookie(res, result.token);
   }
 
   res.json({
@@ -145,10 +158,11 @@ export const refresh = asyncHandler(async (req, res) => {
  * Log out current session
  * POST /users/logout
  */
-export const logout = (req, res) => {
+export const logout = asyncHandler(async (req, res) => {
+  await revokeSession(req.cookies?.refreshToken);
   clearRefreshCookie(res);
   res.json({ message: "Logged out" });
-};
+});
 
 /**
  * Invalidate all sessions across all devices
@@ -160,6 +174,7 @@ export const logoutAll = asyncHandler(async (req, res) => {
 
   user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
+  await revokeAllSessions(user._id);
 
   clearRefreshCookie(res);
   res.json({ message: "Logged out from all devices" });
@@ -309,8 +324,9 @@ export const resetPassword = asyncHandler(async (req, res) => {
   }
 
   user.password = await bcrypt.hash(password, 10);
-  user.tokenVersion = (user.tokenVersion || 0) + 1; // Revoke all existing sessions
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
+  await revokeAllSessions(user._id); // sign out every device
 
   clearRefreshCookie(res);
 
@@ -372,7 +388,7 @@ export const updateMe = asyncHandler(async (req, res) => {
  * GET /users/unsubscribe-digest?token=... or POST /users/unsubscribe-digest
  */
 export const unsubscribeDigest = asyncHandler(async (req, res) => {
-  const token = req.query.token || req.body.token;
+  const token = req.query?.token || req.body?.token;
   if (!token || typeof token !== "string") {
     throw new ApiError(400, "Unsubscribe token is required");
   }
@@ -433,8 +449,9 @@ export const updatePassword = asyncHandler(async (req, res) => {
   user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
 
-  // Re-issue cookie for active session
-  setRefreshCookie(res, user.generateRefreshToken());
+  // Sign out every other device, keep this one signed in with a fresh session
+  await revokeAllSessions(user._id);
+  await issueSession(res, user, req);
 
   sendPasswordChangedNotice({ to: user.email, name: user.name }).catch((err) => {
     logger.error({ err: err.message, userId: user._id }, "Failed to send password notice");
@@ -467,7 +484,8 @@ export const unlinkProvider = asyncHandler(async (req, res) => {
   user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
 
-  setRefreshCookie(res, user.generateRefreshToken());
+  await revokeAllSessions(user._id);
+  await issueSession(res, user, req);
   res.json({ user: publicUser(user), message: `${provider} unlinked successfully` });
 });
 

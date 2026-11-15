@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import logger from "../utils/logger.js";
 import env from "../config/env.js";
+import { escapeHtml } from "../utils/escapeHtml.js";
 
 const clientUrl = (env?.CLIENT_URL || process.env.CLIENT_URL || "http://localhost:5173").replace(/\/+$/, "");
 const mailFrom = process.env.MAIL_FROM || "DevCollab <noreply@devcollab.io>";
@@ -17,6 +18,11 @@ function getTransporter() {
   if (transportType === "smtp" && smtpUrl) {
     transporter = nodemailer.createTransport(smtpUrl);
   } else {
+    if (isProd) {
+      logger.warn(
+        "MAIL_TRANSPORT is not 'smtp' with SMTP_URL set: verification, password-reset and digest emails are only logged, never delivered."
+      );
+    }
     // Console transport (development & testing)
     transporter = {
       sendMail: async (mailOptions) => {
@@ -63,7 +69,7 @@ export async function sendVerificationEmail({ to, name, token }) {
   const text = `Hi ${name || "there"},\n\nPlease verify your email address for DevCollab by visiting the following link:\n${verifyUrl}\n\nThis link will expire in 24 hours.\n\nBest,\nThe DevCollab Team`;
   const html = `<div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px;">
     <h2>Verify your DevCollab account</h2>
-    <p>Hi ${name || "there"},</p>
+    <p>Hi ${escapeHtml(name || "there")},</p>
     <p>Please click the button below to verify your email address:</p>
     <p><a href="${verifyUrl}" style="display: inline-block; padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Verify Email Address</a></p>
     <p>Or copy and paste this URL into your browser:</p>
@@ -83,7 +89,7 @@ export async function sendPasswordResetEmail({ to, name, token }) {
   const text = `Hi ${name || "there"},\n\nWe received a request to reset your DevCollab password. Visit the link below to set a new password:\n${resetUrl}\n\nThis link will expire in 1 hour and can only be used once.\n\nBest,\nThe DevCollab Team`;
   const html = `<div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px;">
     <h2>Reset your password</h2>
-    <p>Hi ${name || "there"},</p>
+    <p>Hi ${escapeHtml(name || "there")},</p>
     <p>We received a request to reset your password. Click the button below to choose a new password:</p>
     <p><a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a></p>
     <p>Or copy and paste this URL into your browser:</p>
@@ -102,7 +108,7 @@ export async function sendPasswordChangedNotice({ to, name }) {
   const text = `Hi ${name || "there"},\n\nThis is a confirmation that your password for DevCollab has been changed.\n\nAll your previous active sessions have been signed out. If you did not make this change, please reset your password immediately.\n\nBest,\nThe DevCollab Team`;
   const html = `<div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px;">
     <h2>Password Changed</h2>
-    <p>Hi ${name || "there"},</p>
+    <p>Hi ${escapeHtml(name || "there")},</p>
     <p>This is a confirmation that your password for DevCollab has been changed.</p>
     <p>All your previous sessions have been signed out. If you did not make this change, please reset your password immediately.</p>
   </div>`;

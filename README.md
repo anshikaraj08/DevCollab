@@ -9,14 +9,14 @@ DevCollab enables developers to write, review, and execute code together in real
 ## 🚀 Key Features
 
 * **Real-Time Multiplayer Collaboration:** Conflict-free document editing powered by Yjs CRDTs and Socket.IO with sub-10ms synchronization, remote peer presence cursors, and local undo/redo isolation.
-* **Horizontal Multi-Instance Scale-Out:** Scalable distributed architecture with `@socket.io/redis-adapter` and an append-only MongoDB update log. Edits converge across separate server instances, with automatic 30-second resync polling and distributed Redis compaction locks.
+* **Optional Multi-Instance Scale-Out:** `@socket.io/redis-adapter` plus an append-only MongoDB update log. Edits converge across server instances, with 30-second resync polling, a Redis compaction lease, and cluster-wide enforcement of role changes. A single instance without Redis is the recommended starting point.
 * **Granular Role-Based Access Control (RBAC):** Formal `owner`, `editor`, and `viewer` roles with 19 distinct permissions enforced across HTTP routes and real-time WebSocket channels. Viewers can inspect code, see live cursors, run code, and test cases, but cannot alter documents or settings.
-* **AI Code Review:** Multi-provider AI code inspections supporting **Google Gemini** and **OpenAI**. Generates line-anchored recommendations categorized by severity (`error`, `warning`, `info`) with Monaco gutter glyphs and one-click conversion to persistent comment threads.
+* **AI Code Review:** AI code inspections via **Anthropic Claude** (default model `claude-opus-5-5`) or **OpenAI**. Generates line-anchored recommendations categorized by severity (`error`, `warning`, `info`) with Monaco gutter glyphs and one-click conversion to persistent comment threads.
 * **Comments v2 & Live Notifications:** In-place comment editing with `(edited)` indicators, interactive `@mention` autocomplete picker for room members, real-time notification bell with unread badges, and optional periodic email digests with one-click unsubscribe links.
 * **Version Snapshot History & Diff View:** Save named versions with a 50-snapshot cap, compare past versions against live code side-by-side or inline via a Monaco `DiffEditor` overlay, and restore past versions with automatic pre-restore backup checkpoints.
 * **OAuth 2.0 & Secure Authentication:** Google and GitHub single-sign-on using state tokens and PKCE, token-based password reset, email verification, and account linking/unlinking guards.
 * **Multi-Language Runner with Stdin & Shared Tests:** Run C++, Python, JavaScript, and Java with stdin support (persisted locally per room), shared 10-test-case suites with sequential "Run all", expected vs. actual mismatch diffing, and 15s execution timeouts.
-* **Production Observability & Security:** Prometheus metrics at `/metrics`, Sentry error monitoring with source-code redaction, health probes (`/healthz`, `/readyz`), Helmet security headers, rate limiting, and Docker multi-stage container builds.
+* **Production Observability & Security:** Token-protected Prometheus metrics at `/metrics`, Sentry error monitoring with source-code redaction, health probes (`/healthz`, `/readyz`), rotating server-side refresh sessions, Helmet and CSP headers, proxy-aware rate limiting, and Docker multi-stage container builds.
 
 ---
 
@@ -37,7 +37,7 @@ DevCollab enables developers to write, review, and execute code together in real
 
 - 📄 **[PROJECT_STATUS.md](./PROJECT_STATUS.md)** — Architecture reference, endpoint catalog, socket events, release checklist, and implementation history.
 - 🚀 **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** — Step-by-step production deployment guide for free-tier cloud hosting (Render + Vercel + MongoDB Atlas + Upstash Redis).
-- 🛡️ **[docs/SECURITY.md](./docs/SECURITY.md)** — 14-point security evaluation covering authentication, tokens, CORS, CSP, input validation, and secret hygiene.
+- 🛡️ **[docs/SECURITY.md](./docs/SECURITY.md)** — Security model: sessions, RBAC, CORS, CSP, rate limits, validation, OAuth rules, and known limitations.
 - ⚡ **[docs/PERFORMANCE.md](./docs/PERFORMANCE.md)** — Measured load test benchmarks, event latencies, and resource utilization across single and multi-instance modes.
 - 🔐 **[docs/PERMISSIONS.md](./docs/PERMISSIONS.md)** — Comprehensive RBAC permission matrix for owners, editors, and viewers.
 
@@ -52,9 +52,10 @@ DevCollab enables developers to write, review, and execute code together in real
 
 ### 1. Environment Configuration
 
-Copy `.env.example` in both backend and root:
+Copy the example files:
 ```bash
-cp .env.example backend/.env
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 ```
 
 Key environment variables:
@@ -63,9 +64,10 @@ PORT=5000
 NODE_ENV=development
 MONGO_URI=mongodb://localhost:27017/devcollab
 JWT_ACCESS_SECRET=your-secure-jwt-access-secret-at-least-32-chars-long
-JWT_REFRESH_SECRET=your-secure-jwt-refresh-secret-at-least-32-chars-long
 CLIENT_URL=http://localhost:5173
 ```
+
+In production also set `TRUST_PROXY=1` (behind Render's proxy), `MAIL_TRANSPORT=smtp` with `SMTP_URL` (otherwise verification and reset emails are only logged), `API_URL` (for OAuth) and `COOKIE_SECRET`. The full list is in [PROJECT_STATUS.md §5](./PROJECT_STATUS.md#5-environment-variables-reference).
 
 ### 2. Run Locally
 
@@ -109,14 +111,15 @@ docker compose --profile scale-out up --build
 
 ## 🧪 Testing & Verification
 
-### Backend Test Suite (15 suites, 119 tests)
+### Backend Test Suite (18 files, 133 tests)
 ```bash
 npm --prefix backend test
 ```
 
-### Frontend Test Suite (12 suites, 57 tests)
+### Frontend Test Suite (12 files, 57 tests) and Lint
 ```bash
-npm --prefix frontend test -- --run
+npm --prefix frontend test
+npm --prefix frontend run lint
 ```
 
 ### Production Build

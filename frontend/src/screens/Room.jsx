@@ -93,6 +93,9 @@ export default function Room() {
   const [aiError, setAiError] = useState(null);
   const aiCancelRef = useRef(false);
   const aiDecorationsRef = useRef(null);
+  // Values derived from refs are kept in state so render never reads a ref
+  const [editorModel, setEditorModel] = useState(null);
+  const [diffCurrentCode, setDiffCurrentCode] = useState("");
 
   // Helper to reliably get latest code from collab, editor, or room
   const getCode = useCallback(() => {
@@ -248,7 +251,7 @@ export default function Room() {
       socket.off("tests:updated", onTestsUpdated);
       socket.off("ai:changed", onAiChanged);
     };
-  }, [collab?.socket, collab, loadSnapshots, toast]);
+  }, [collab?.socket, collab, loadSnapshots, loadAiReviews, toast]);
 
   // When editor becomes read-only or status is not synced, clear undo history
   useEffect(() => {
@@ -263,12 +266,12 @@ export default function Room() {
   useEffect(() => {
     if (!collab?.binding) return;
     const b = collab.binding;
-    b.onStackChange = ({ canUndo: u, canRedo: r }) => {
-      setCanUndo(u);
-      setCanRedo(r);
-    };
     setCanUndo(b.canUndo());
     setCanRedo(b.canRedo());
+    return b.subscribeStack(({ canUndo: u, canRedo: r }) => {
+      setCanUndo(u);
+      setCanRedo(r);
+    });
   }, [collab?.binding]);
 
   // Handle Save
@@ -357,12 +360,13 @@ export default function Room() {
   const onMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    setEditorModel(editor.getModel());
     const binding = collab?.attachEditor(editor, monaco);
     if (binding) {
-      binding.onStackChange = ({ canUndo: u, canRedo: r }) => {
+      binding.subscribeStack(({ canUndo: u, canRedo: r }) => {
         setCanUndo(u);
         setCanRedo(r);
-      };
+      });
       setCanUndo(binding.canUndo());
       setCanRedo(binding.canRedo());
     }
@@ -501,7 +505,7 @@ export default function Room() {
 
   // Comment handlers
   const handleAddComment = async (lineOrObj, maybeText, maybeMentions) => {
-    let line, text, mentions = [];
+    let line, text, mentions;
     if (typeof lineOrObj === "object" && lineOrObj !== null) {
       line = lineOrObj.line;
       text = lineOrObj.text || lineOrObj.content;
@@ -979,7 +983,7 @@ export default function Room() {
               setDiffSnapshotId(null);
             }}
             snapshots={snapshots}
-            currentCode={getCode()}
+            currentCode={diffCurrentCode}
             onRefreshCurrent={getCode}
             language={room.language}
             isDark={isDark}
@@ -1078,6 +1082,7 @@ export default function Room() {
                   onDelete={(snap) => setDeleteTarget(snap)}
                   onCompare={(snap) => {
                     setDiffSnapshotId(snap._id);
+                    setDiffCurrentCode(getCode());
                     setDiffOpen(true);
                   }}
                   loading={snapshotsLoading}
@@ -1099,7 +1104,7 @@ export default function Room() {
                   currentUserId={user?._id || user?.id}
                   roomOwnerId={room?.createdBy?._id || room?.createdBy}
                   ytext={collab?.ytext}
-                  editorModel={editorRef.current?.getModel?.()}
+                  editorModel={editorModel}
                   error={aiError}
                 />
               ) : null}

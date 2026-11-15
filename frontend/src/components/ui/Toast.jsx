@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react";
 
 const ToastContext = createContext(null);
 
@@ -23,13 +23,17 @@ export function ToastProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const toast = useCallback(
-    (message, type = "info") => addToast(message, type),
+  // Build the callable toast() with its .success/.error/.info helpers once,
+  // instead of mutating a memoized function on every render.
+  const toast = useMemo(
+    () =>
+      Object.assign((message, type = "info") => addToast(message, type), {
+        success: (msg) => addToast(msg, "success"),
+        error: (msg) => addToast(msg, "error"),
+        info: (msg) => addToast(msg, "info"),
+      }),
     [addToast]
   );
-  toast.success = (msg) => addToast(msg, "success");
-  toast.error = (msg) => addToast(msg, "error");
-  toast.info = (msg) => addToast(msg, "info");
 
   useEffect(() => {
     const handleGlobalToast = (e) => {

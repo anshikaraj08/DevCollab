@@ -10,13 +10,8 @@ export default function AuthCallback() {
   const { setUser } = useContext(UserContext);
   const [error, setError] = useState(searchParams.get("error") || "");
 
-  const getSafeNext = () => {
-    const next = searchParams.get("next");
-    if (next && next.startsWith("/") && !next.startsWith("//")) {
-      return next;
-    }
-    return "/dashboard";
-  };
+  const rawNext = searchParams.get("next");
+  const safeNext = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
 
   useEffect(() => {
     if (error) return;
@@ -28,7 +23,7 @@ export default function AuthCallback() {
         if (!mounted) return;
         setAccessToken(res.data.accessToken);
         setUser(res.data.user);
-        navigate(getSafeNext(), { replace: true });
+        navigate(safeNext, { replace: true });
       })
       .catch((err) => {
         if (!mounted) return;
@@ -41,7 +36,7 @@ export default function AuthCallback() {
     return () => {
       mounted = false;
     };
-  }, [error, navigate, setUser]);
+  }, [error, navigate, setUser, safeNext]);
 
   if (error) {
     return (

@@ -1,285 +1,647 @@
-# DevCollab — Complete Beginner's Step-by-Step Deployment Guide
+# DevCollab: First-Time Deployment Guide (Step by Step)
 
-> **Welcome!** If this is your first time deploying a web application, this guide is written specifically for you.  
-> We will walk through every step from pushing your code to GitHub to having your live app accessible to anyone in the world — completely **free of cost**, without buying any domains.
+This guide takes you from "the code is on my laptop" to "anyone can open my app in their browser". It assumes you have never deployed anything before. Every click and every value is written out.
 
----
+**Time needed:** about 1.5–2 hours the first time.
+**Cost:** $0. Every service below has a free tier. You do not need a credit card or a domain.
 
-## 📋 What We Are Deploying & Where
-
-DevCollab has three parts:
-1. **Frontend (The User Interface):** React + Monaco Editor. We will host this on **Vercel** (Free).
-2. **Backend (The API & WebSockets):** Express + Socket.IO + Yjs CRDTs. We will host this on **Render** (Free Docker Web Service).
-3. **Database (Persistent Storage):** MongoDB Atlas (Free M0 Cluster).
-4. *(Optional)* **Redis (Multi-Instance Scaling):** Upstash (Free Serverless Redis).
+> Commands in this guide are for **PowerShell** on Windows (the VS Code terminal uses it by default). Run them from the project folder `C:\All Projects\DevCollab` unless a step says otherwise.
 
 ---
 
-## Part 1: Push Your Code to GitHub
+## Table of contents
 
-Before deploying to the cloud, your code must be on GitHub so Render and Vercel can pull it.
+0. [How the pieces fit together](#part-0-how-the-pieces-fit-together)
+1. [Before you start: accounts and a notes file](#part-1-before-you-start)
+2. [Check the code and put it on GitHub](#part-2-check-the-code-and-put-it-on-github)
+3. [Create the database (MongoDB Atlas)](#part-3-create-the-database-mongodb-atlas)
+4. [Set up email sending (Brevo)](#part-4-set-up-email-sending-brevo)
+5. [Deploy the backend (Render)](#part-5-deploy-the-backend-render)
+6. [Deploy the frontend (Vercel)](#part-6-deploy-the-frontend-vercel)
+7. [Connect the two halves](#part-7-connect-the-two-halves)
+8. [Test everything](#part-8-test-everything)
+9. [Optional: Google and GitHub sign-in](#part-9-optional-google-and-github-sign-in)
+10. [Optional: AI code review](#part-10-optional-ai-code-review)
+11. [Updating the app later](#part-11-updating-the-app-later)
+12. [Troubleshooting](#part-12-troubleshooting)
+13. [Limits of the free setup](#part-13-limits-of-the-free-setup)
 
-### Step 1.1: Create a Repository on GitHub
-1. Open your browser and go to [github.com](https://github.com). Log in (or create an account if you don't have one).
-2. Click the **+** (plus icon) in the top-right corner and select **New repository**.
-3. Choose a name, for example: `devcollab`.
-4. Choose **Public** or **Private** (either works fine; Private keeps your code confidential).
-5. **Do NOT** check "Add a README file" or ".gitignore" (we already have them in our project).
-6. Click **Create repository**.
-7. GitHub will show you a page with your repository URL. It looks like:
-   `https://github.com/<YOUR_GITHUB_USERNAME>/devcollab.git`
-   Keep this tab open!
+---
 
-### Step 1.2: Push Local Code from Your Computer
-Open your terminal in `C:\All Projects\DevCollab` (or use PowerShell / VS Code terminal).
+## Part 0: How the pieces fit together
 
-Run these commands one by one:
+DevCollab is made of three parts. Each one lives on a different service:
 
-```bash
-# 1. Check your current branch
-git branch
 ```
-*(You will see `* phase-4`)*
+   Visitor's browser
+         │
+         │ 1. loads the web pages (HTML, JS, CSS)
+         ▼
+ ┌───────────────────┐
+ │  VERCEL           │  frontend  (React app, the "frontend/" folder)
+ │  your-app.vercel.app
+ └───────────────────┘
+         │
+         │ 2. the page then talks to the API + live socket
+         ▼
+ ┌───────────────────┐
+ │  RENDER           │  backend  (Express API + Socket.IO, the "backend/" folder)
+ │  your-api.onrender.com
+ └───────────────────┘
+         │
+         │ 3. the backend stores everything here
+         ▼
+ ┌───────────────────┐
+ │  MONGODB ATLAS    │  database (users, rooms, code, comments…)
+ └───────────────────┘
 
-```bash
-# 2. Switch to the main branch (or create it if it doesn't exist yet)
-git checkout -b main
+ Brevo  → sends emails (verify email, reset password) for the backend
+```
 
-# 3. Merge all Phase 4 work into main
+You will build it **bottom-up**: database first, then backend, then frontend. Then you connect the backend to the frontend's address.
+
+**Two words you will see a lot:**
+- **Environment variable ("env var"):** a named setting, like `MONGO_URI=...`, that you type into the hosting dashboard instead of into the code. Secrets (passwords, keys) must **only** go in env vars, never in code.
+- **Deploy:** the hosting service downloads your code from GitHub, builds it and starts it.
+
+---
+
+## Part 1: Before you start
+
+### 1.1 Create these accounts (all free)
+
+| Service | What it's for | Sign up at | Tip |
+|---|---|---|---|
+| GitHub | Stores your code | github.com | You already have one: `anshikaraj08` |
+| MongoDB Atlas | Database | mongodb.com/cloud/atlas/register | "Sign up with Google" is fastest |
+| Brevo | Sends emails | brevo.com | Free plan: 300 emails/day |
+| Render | Runs the backend | render.com | Click **Sign in with GitHub** |
+| Vercel | Hosts the frontend | vercel.com | Click **Continue with GitHub** |
+
+### 1.2 Make a private notes file
+
+You will collect about ten values (passwords, URLs, keys) along the way. Create a file **outside the project folder**, for example `C:\Users\<you>\Documents\devcollab-deploy-notes.txt`, and paste this into it:
+
+```
+MONGO_URI          =
+JWT_ACCESS_SECRET  =
+COOKIE_SECRET      =
+SMTP_URL           =
+MAIL_FROM          =
+BACKEND URL        = https://....onrender.com
+FRONTEND URL       = https://....vercel.app
+```
+
+> ⚠️ Never save this file inside `C:\All Projects\DevCollab`. Never commit it to Git and never paste these values into chats or screenshots.
+
+### 1.3 Generate two secrets now
+
+Run this command **twice** in PowerShell. Each run prints a different random 96-character string:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+Paste the first result after `JWT_ACCESS_SECRET =` and the second after `COOKIE_SECRET =` in your notes.
+
+- `JWT_ACCESS_SECRET` signs the login tokens. If someone learns it, they can impersonate any user.
+- `COOKIE_SECRET` signs the temporary cookie used during Google/GitHub sign-in.
+
+---
+
+## Part 2: Check the code and put it on GitHub
+
+Render and Vercel both deploy from GitHub, from the `main` branch. Your latest work is on the `phase-4` branch and is not committed yet.
+
+### 2.1 Run the tests (optional, recommended)
+
+```powershell
+cd "C:\All Projects\DevCollab\backend"
+npm install
+npm test
+
+cd "C:\All Projects\DevCollab\frontend"
+npm install
+npm test
+npm run build
+
+cd "C:\All Projects\DevCollab"
+```
+
+Expected: the backend reports `pass 133` and `fail 0`, the frontend reports `57 passed`, and the build finishes with `✓ built in ...`. If something fails, stop and fix it first.
+
+### 2.2 Check that no secrets will be committed
+
+```powershell
+git status
+```
+
+Look through the list. You must **not** see `backend/.env` or `frontend/.env`; they are excluded by `.gitignore`. You **should** see the `.env.example` files. Those contain placeholders only and are safe to commit.
+
+### 2.3 Commit and push `phase-4`
+
+```powershell
+git add -A
+git commit -m "Production hardening: sessions, rate limiting, persistence, docs"
+git push origin phase-4
+```
+
+If Git asks you to log in, choose **Sign in with your browser** and approve.
+
+### 2.4 Move the work to `main`
+
+```powershell
+git checkout main
+git pull origin main
 git merge phase-4
-
-# 4. Link your local project to your new GitHub repository
-# Replace <YOUR_GITHUB_USERNAME> with your actual GitHub username!
-git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/devcollab.git
-
-# If git says "remote origin already exists", update it instead:
-# git remote set-url origin https://github.com/<YOUR_GITHUB_USERNAME>/devcollab.git
-
-# 5. Push your code to GitHub!
-git push -u origin main
+git push origin main
+git checkout phase-4
 ```
 
-*(If Git asks you to sign in, click "Sign in with your browser" and authorize GitHub.)*
+- If `git merge` opens a text editor for the merge message, save and close it.
+- If it says **CONFLICT**, stop and ask for help. Don't guess.
 
-Once complete, refresh your GitHub repository page. You will see all your project files!
+Open `https://github.com/anshikaraj08/DevCollab` in your browser and switch the branch selector to `main`. You should see a recent commit time.
 
 ---
 
-## Part 2: Set Up MongoDB Atlas (Free Cloud Database)
+## Part 3: Create the database (MongoDB Atlas)
 
-MongoDB Atlas stores your users, rooms, comments, version snapshots, and code updates.
+### 3.1 Create a free cluster
 
-### Step 2.1: Create Your Free Cluster
-1. Go to [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas) and sign up for a free account.
-2. After logging in, click **Create** (or **Deploy Database**).
-3. Under Deployment Options, select the **M0 Free** tier.
-4. Choose a Cloud Provider & Region (e.g., **AWS** in a region close to you, like `N. Virginia (us-east-1)` or `Frankfurt (eu-central-1)`).
-5. Name your cluster (e.g., `Cluster0`) and click **Create Deployment**.
+1. Log in to **cloud.mongodb.com**. If it asks you to create an organization or project, accept the defaults or name the project `DevCollab`.
+2. Click **Create** (or **Build a Database** / **Create cluster**).
+3. Choose **M0 / Free**.
+4. **Provider:** AWS. **Region:** pick one, and **remember it**, because you will pick the closest Render region later. Good pairs:
+   - Atlas `Frankfurt (eu-central-1)` ↔ Render `Frankfurt`
+   - Atlas `N. Virginia (us-east-1)` ↔ Render `Virginia (US East)`
+   - Atlas `Singapore (ap-southeast-1)` ↔ Render `Singapore`
+5. Name: `Cluster0` is fine. Click **Create Deployment**. It takes 1–3 minutes.
 
-### Step 2.2: Create Database Credentials
-1. In the "Quickstart" security setup:
-   - **Username:** `devcollab_admin` (or any username you choose).
-   - **Password:** Click "Autogenerate Secure Password" or type a strong password.  
-     ⚠️ **Important:** Copy this password and paste it into a safe text document. You will need it in a moment.
-   - Click **Create User**.
+### 3.2 Create a database user
 
-### Step 2.3: Whitelist Network Access
-Render cloud servers need permission to connect to your database:
-1. In the same security screen (or go to **Network Access** in the left sidebar):
-2. Click **Add IP Address**.
-3. Click the button **Allow Access from Anywhere** (this enters `0.0.0.0/0`).
-4. Click **Confirm**.
+A popup asks you to create a database user (or go to **Security → Database Access → Add New Database User**).
 
-### Step 2.4: Get Your Connection String
-1. Go to **Databases** in the left sidebar.
-2. Click the **Connect** button next to your cluster.
-3. Select **Drivers** (Node.js).
-4. You will see a connection string that looks like this:
-   ```text
-   mongodb+srv://devcollab_admin:<db_password>@cluster0.abcde.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+1. Username: `devcollab_app`
+2. Password: click **Autogenerate Secure Password**, then **Copy**. Paste it into your notes right away.
+   > Use letters and numbers only. Characters like `@ : / ? #` break the connection string unless you encode them. The autogenerated password is safe.
+3. Role: **Read and write to any database** (the default "Atlas admin" also works, but read/write is enough).
+4. Click **Create User**.
+
+### 3.3 Allow Render to connect
+
+Render's free tier has no fixed IP address, so Atlas must accept connections from anywhere. The password is what protects the database.
+
+1. Go to **Security → Network Access → Add IP Address**.
+2. Click **Allow Access from Anywhere**. This fills in `0.0.0.0/0`.
+3. Click **Confirm**. Wait until the status shows **Active**.
+
+### 3.4 Build your `MONGO_URI`
+
+1. Go to **Database → Clusters**, click **Connect** on your cluster, then **Drivers**.
+2. Copy the string. It looks like this:
    ```
-5. Copy this string. Replace `<db_password>` with the password you saved in Step 2.2.
-6. Right before the `?retryWrites=true`, add the database name `/devcollab`. Your final string should look like:
-   ```text
-   mongodb+srv://devcollab_admin:YourSecretPassword123@cluster0.abcde.mongodb.net/devcollab?retryWrites=true&w=majority&appName=Cluster0
+   mongodb+srv://devcollab_app:<db_password>@cluster0.ab1cd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
    ```
-   Save this — this is your `MONGO_URI`.
+3. Edit it in your notes:
+   - Replace `<db_password>` (including the `< >`) with the password from 3.2.
+   - Add the database name `devcollab` between `.net/` and `?`.
+
+   Final result:
+   ```
+   mongodb+srv://devcollab_app:Xy7pQ2...@cluster0.ab1cd.mongodb.net/devcollab?retryWrites=true&w=majority&appName=Cluster0
+   ```
+4. Save it as `MONGO_URI` in your notes.
+
+You don't need to create collections or indexes. The backend creates them the first time it starts.
 
 ---
 
-## Part 3: (Optional) Set Up Upstash Redis for Multi-Instance Scale-Out
+## Part 4: Set up email sending (Brevo)
 
-DevCollab runs with full functionality on a single instance without Redis. If you want multi-server pub/sub scaling, you can grab a free Redis database in 1 minute:
+The app sends emails for **email verification**, **password reset**, "your password was changed" notices and **weekly digests**.
 
-1. Go to [upstash.com](https://upstash.com/) and sign up with GitHub.
-2. Click **Create Database**.
-3. Choose a Name (e.g. `devcollab-redis`) and select your nearest region.
-4. Select the **Free Tier**.
-5. Once created, scroll down to the **Connect** section and select **ioredis** or **Redis URL**.
-6. Copy the connection URL starting with `rediss://...`.
-7. Save this — this is your `REDIS_URL`.
+> **Why not Gmail?** Since September 2025, Render's free tier **blocks outgoing email on ports 25, 465 and 587**, the ports Gmail and most guides use. Emails would silently time out. Brevo also accepts port **2525**, which Render does not block.
+
+### 4.1 Verify a sender address
+
+1. Log in to **app.brevo.com**.
+2. Go to **Senders, Domains & Dedicated IPs → Senders** (on older layouts, open the account menu top-right, then **Senders & IP**).
+3. Click **Add a sender**:
+   - From name: `DevCollab`
+   - From email: your own email, for example a Gmail address
+4. Brevo emails you a code or link. Confirm it.
+
+### 4.2 Get the SMTP login and key
+
+1. Go to **SMTP & API** (in settings, or at `app.brevo.com/settings/keys/smtp`).
+2. On the **SMTP** tab you'll see:
+   - **SMTP server:** `smtp-relay.brevo.com`
+   - **Login:** something like `8a1b2c001@smtp-brevo.com`
+3. Click **Generate a new SMTP key**, name it `devcollab-render`, and copy the key. It starts with `xsmtpsib-...`.
+   > Use the **SMTP key**, not an "API key". They are different.
+
+### 4.3 Build your `SMTP_URL`
+
+The format is `smtp://LOGIN:KEY@smtp-relay.brevo.com:2525`.
+
+**Important:** the login contains `@`, which must be written as `%40` inside a URL.
+
+| Piece | Example |
+|---|---|
+| Login | `8a1b2c001@smtp-brevo.com` → **`8a1b2c001%40smtp-brevo.com`** |
+| Key | `xsmtpsib-abc123...` |
+| Final `SMTP_URL` | `smtp://8a1b2c001%40smtp-brevo.com:xsmtpsib-abc123...@smtp-relay.brevo.com:2525` |
+
+Save it in your notes. Also save:
+```
+MAIL_FROM = DevCollab <the-email-you-verified-in-4.1@gmail.com>
+```
+The address in `MAIL_FROM` **must** be the sender you verified in 4.1, or Brevo rejects the email.
 
 ---
 
-## Part 4: Deploy the Backend on Render (Free Web Service)
+## Part 5: Deploy the backend (Render)
 
-Render will run your Node.js Docker container for the Express API and Socket.IO real-time server.
+### 5.1 Create the web service
 
-### Step 4.1: Create Web Service
-1. Go to [dashboard.render.com](https://dashboard.render.com/) and sign in with GitHub.
-2. Click the blue **New +** button in the top right → select **Web Service**.
-3. Choose **Build and deploy from a Git repository** → Click **Next**.
-4. Find your `devcollab` repository and click **Connect**.
+1. Log in to **dashboard.render.com**.
+2. Click **+ New → Web Service**.
+3. Choose **Git Provider → GitHub**. If you don't see your repository, click **Configure GitHub** and give Render access to `DevCollab`.
+4. Select `anshikaraj08/DevCollab` and click **Connect**.
 
-### Step 4.2: Configure Web Service Settings
-Fill in these fields on the settings page:
-- **Name:** `devcollab-api` (or any unique name).
-- **Region:** Choose the region closest to your MongoDB Atlas cluster.
-- **Branch:** `main`
-- **Language/Runtime:** Select **Docker** from the dropdown.
-- **Dockerfile Path:** `backend/Dockerfile`
-- **Docker Build Context Directory:** `backend`
-- **Instance Type:** Select **Free** (512 MB RAM / 0.1 CPU).
+### 5.2 Fill in the settings
 
-### Step 4.3: Health Check
-Scroll down and click **Advanced**:
-- **Health Check Path:** type `/readyz`
+| Field | Value |
+|---|---|
+| **Name** | `devcollab-api`. This becomes part of the URL; if it's taken, try `devcollab-api-anshika` |
+| **Language** | `Docker` |
+| **Branch** | `main` |
+| **Region** | Same area as your Atlas cluster (see 3.1) |
+| **Root Directory** | *leave empty* |
+| **Instance Type** | **Free** |
 
-### Step 4.4: Add Environment Variables
-Under the **Environment Variables** section on the same page, click **Add Environment Variable** for each of the following:
+Scroll down and expand **Advanced**:
 
-| Key | Example Value | Explanation |
+| Field | Value |
+|---|---|
+| **Dockerfile Path** | `./backend/Dockerfile` |
+| **Docker Build Context Directory** | `./backend` |
+| **Health Check Path** | `/readyz` |
+| **Auto-Deploy** | `On Commit` (Yes) |
+
+> `/readyz` answers "OK" only when the server is up **and** connected to MongoDB, so Render won't send visitors to a broken server.
+
+### 5.3 Add the environment variables
+
+In the **Environment Variables** section, click **+ Add Environment Variable** for each row. Type the key exactly as shown; keys are case-sensitive.
+
+**Required:**
+
+| Key | Value | Notes |
 |---|---|---|
-| `PORT` | `5000` | The internal port the server listens on |
-| `NODE_ENV` | `production` | Tells Node and Express to run in production mode |
-| `MONGO_URI` | `mongodb+srv://...` | The MongoDB string you created in Part 2 |
-| `JWT_ACCESS_SECRET` | `generate-a-random-string-at-least-32-chars-long-123456` | Secret key used to encrypt login access tokens |
-| `JWT_REFRESH_SECRET` | `generate-another-random-string-at-least-32-chars-long-abcdef` | Secret key used to encrypt refresh tokens |
-| `COOKIE_SAMESITE` | `none` | **Crucial:** Allows login cookies to work across Vercel and Render free subdomains |
-| `TRUST_PROXY` | `1` | Tells Express it is running behind Render's HTTPS reverse proxy |
-| `APP_VERSION` | `1.0.0` | Version label |
-| `CLIENT_URL` | `http://localhost:5173` | *(Temporary placeholder — we will update this to your Vercel URL in Part 6)* |
-| `CLIENT_URLS` | `http://localhost:5173` | *(Temporary placeholder — we will update this to your Vercel URL in Part 6)* |
-| `REDIS_URL` | `rediss://...` *(Optional)* | Only add if you created an Upstash Redis database in Part 3 |
+| `NODE_ENV` | `production` | Turns on production security settings |
+| `PORT` | `5000` | Port the server listens on inside the container |
+| `MONGO_URI` | *from your notes* | Part 3.4 |
+| `JWT_ACCESS_SECRET` | *from your notes* | Part 1.3 |
+| `COOKIE_SECRET` | *from your notes* | Part 1.3 |
+| `TRUST_PROXY` | `1` | Render puts one proxy in front of your app. Without this, every visitor shares one rate limit and you would lock everyone out |
+| `COOKIE_SAMESITE` | `none` | Lets the login cookie work between `vercel.app` and `onrender.com` |
+| `CLIENT_URL` | `http://localhost:5173` | **Placeholder.** You replace it with the Vercel URL in Part 7 |
+| `CLIENT_URLS` | `http://localhost:5173` | **Placeholder.** Same as above |
+| `MAIL_TRANSPORT` | `smtp` | Actually send emails (otherwise they're only logged) |
+| `SMTP_URL` | *from your notes* | Part 4.3 |
+| `MAIL_FROM` | *from your notes* | Part 4.3 |
 
-> 💡 **Tip for Secrets:** You can generate a secure 32-character string in any terminal by running:
-> ```bash
-> node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-> ```
+**Add later:**
 
-### Step 4.5: Deploy Backend
-1. Click **Create Web Service** at the bottom.
-2. Render will start downloading and building your Docker container. This takes about 2 to 3 minutes.
-3. Once the logs say `Server listening on port 5000` and the status badge turns **Live**, copy your backend URL at the top left of the screen:
-   Example: `https://devcollab-api.onrender.com`
+| Key | When |
+|---|---|
+| `API_URL` | Part 5.5, once you know the backend URL |
 
----
+**Do NOT add:**
+- `REDIS_URL`. It's only needed when you run **more than one** backend server. One server without Redis is the simple, supported setup.
+- `JWT_REFRESH_SECRET`. It's no longer used.
+- Anything with a blank value. Leave unused settings out entirely.
 
-## Part 5: Deploy the Frontend on Vercel (Free CDN Hosting)
+### 5.4 Deploy
 
-Vercel will compile and host your React 19 single-page application.
+1. Click **Deploy Web Service**.
+2. You'll see a log streaming. The first build takes **3–6 minutes**. Normal lines include `Step 1/…`, `npm ci`, `Pushing image`.
+3. Success looks like:
+   ```
+   Server running on port 5000
+   ==> Your service is live 🎉
+   ```
+   and the status badge at the top turns green: **Live**.
 
-### Step 5.1: Import Project in Vercel
-1. Go to [vercel.com](https://vercel.com/) and sign in with GitHub.
-2. On your Vercel Dashboard, click **Add New…** → **Project**.
-3. Find your `devcollab` repository and click **Import**.
+At the top left, under the service name, Render shows your URL, for example `https://devcollab-api.onrender.com`. Copy it into your notes as **BACKEND URL**, without a slash at the end.
 
-### Step 5.2: Configure Build Settings
-On the "Configure Project" screen:
-1. **Framework Preset:** Select **Vite**.
-2. **Root Directory:** Click **Edit** next to Root Directory, select the `frontend` folder, and click **Continue**.
-3. **Build Command:** Leave as default (`npm run build`).
-4. **Output Directory:** Leave as default (`dist`).
+### 5.5 Add `API_URL` and check the backend
 
-### Step 5.3: Add Environment Variables
-Expand the **Environment Variables** section:
-Add one environment variable:
-- **Key:** `VITE_API_URL`
-- **Value:** `https://devcollab-api.onrender.com` *(use your actual Render URL from Step 4.5, without a trailing slash)*
+1. In the left menu, click **Environment → + Add Environment Variable**:
+   - `API_URL` = your backend URL, e.g. `https://devcollab-api.onrender.com`
+2. Click **Save, rebuild, and deploy** (or **Save Changes**). Wait for **Live** again.
+3. Open these two URLs in your browser:
+   - `https://YOUR-BACKEND.onrender.com/healthz` should show `{"status":"ok"}`
+   - `https://YOUR-BACKEND.onrender.com/readyz` should show `{"status":"ok","checks":{"database":"connected"}}`. `"degraded"` means the database connection failed
 
-### Step 5.4: Deploy Frontend
-1. Click **Deploy**.
-2. Vercel will install dependencies and run the Vite build in under 1 minute.
-3. When finished, you will see confetti and a screenshot preview of your app!
-4. Click on the domain link to copy your frontend URL. It will look like:
-   `https://devcollab-seven.vercel.app`
+   If `/readyz` fails, see [Troubleshooting → database](#the-backend-wont-start-or-readyz-fails).
 
 ---
 
-## Part 6: Connect Backend to Frontend (The Handshake)
+## Part 6: Deploy the frontend (Vercel)
 
-Now that you have your live Vercel URL, you need to tell your Render backend to accept logins and socket connections from this URL!
+### 6.1 Import the project
 
-1. Go back to your [Render Dashboard](https://dashboard.render.com/).
-2. Click on your `devcollab-api` service.
-3. Click **Environment** in the left sidebar.
-4. Find the two variables you set as placeholders earlier and edit them:
-   - `CLIENT_URL` ➡️ `https://your-app-name.vercel.app`
-   - `CLIENT_URLS` ➡️ `https://your-app-name.vercel.app`
-   *(Replace with your actual Vercel URL, with no trailing slash `/`)*
-5. Click **Save Changes**.
-6. Render will automatically redeploy with the new settings in ~30 seconds.
+1. Log in to **vercel.com**.
+2. Click **Add New… → Project**.
+3. Find `DevCollab` in the list and click **Import**. If it's not listed, click **Adjust GitHub App Permissions** and give Vercel access to the repository.
+
+### 6.2 Configure the build
+
+| Field | Value |
+|---|---|
+| **Project Name** | `devcollab`. This becomes `devcollab.vercel.app` if it's free; otherwise Vercel adds a suffix |
+| **Framework Preset** | `Vite` (usually auto-detected) |
+| **Root Directory** | Click **Edit**, choose `frontend`, then **Continue** |
+| **Build Command** | leave default (`npm run build`) |
+| **Output Directory** | leave default (`dist`) |
+| **Install Command** | leave default |
+
+### 6.3 Add the environment variable
+
+Expand **Environment Variables** and add:
+
+| Key | Value |
+|---|---|
+| `VITE_API_URL` | your backend URL, e.g. `https://devcollab-api.onrender.com`, with **no** slash at the end |
+
+> ⚠️ `VITE_` variables are baked into the website **when it's built**. If you change this value later, you must **redeploy** the frontend (Part 11.2) for the change to take effect.
+
+### 6.4 Deploy
+
+1. Click **Deploy**. The build takes 1–2 minutes.
+2. When you see **Congratulations!**, click **Continue to Dashboard**.
+3. Under **Domains** you'll see your URL, e.g. `https://devcollab.vercel.app`. Copy it into your notes as **FRONTEND URL**, without a slash at the end.
+
+> Use the **short production domain** listed under "Domains". Vercel also creates long preview URLs like `devcollab-git-main-xyz.vercel.app`; don't use those for `CLIENT_URL`.
 
 ---
 
-## Part 7: Final Verification & Smoke Test
+## Part 7: Connect the two halves
 
-### Step 7.1: Synchronize Database Indexes
-On your local computer, run this command in your terminal so MongoDB Atlas creates all optimized search indexes:
-```bash
-# In your terminal:
-node backend/scripts/ensure-indexes.js
+Right now the backend only trusts `http://localhost:5173`. Tell it to trust your Vercel site:
+
+1. Go to Render → `devcollab-api` → **Environment**.
+2. Edit these two variables:
+
+   | Key | New value |
+   |---|---|
+   | `CLIENT_URL` | `https://devcollab.vercel.app` (your FRONTEND URL) |
+   | `CLIENT_URLS` | `https://devcollab.vercel.app` (same value) |
+
+   Rules: start with `https://`, **no** slash at the end, no spaces.
+3. Click **Save, rebuild, and deploy**. Wait for **Live**.
+
+**What each one does:**
+- `CLIENT_URLS` is the list of websites allowed to call your API. Anything else gets "CORS origin denied".
+- `CLIENT_URL` is used to build links inside emails and to redirect after Google/GitHub sign-in.
+
+> If you later add a custom domain, put both in `CLIENT_URLS`, separated by a comma: `https://devcollab.vercel.app,https://www.mydomain.com`.
+
+---
+
+## Part 8: Test everything
+
+### 8.1 Automated smoke test (from your laptop)
+
+This script talks to the **live** backend. It registers a test user, creates a room, opens a live socket and joins the room.
+
+```powershell
+cd "C:\All Projects\DevCollab"
+$env:API_URL = "https://devcollab-api.onrender.com"   # your BACKEND URL
+node scripts/smoke.mjs
+Remove-Item Env:API_URL
 ```
-*(Make sure your local `backend/.env` has your `MONGO_URI` set to your Atlas connection string, or pass it inline like `MONGO_URI="mongodb+srv://..." node backend/scripts/ensure-indexes.js`)*
 
-### Step 7.2: Run the Automated Smoke Test
-You can run our automated smoke test right from your computer against your live cloud deployment:
-```bash
-API_URL="https://devcollab-api.onrender.com" node scripts/smoke.mjs
-```
-*(Replace with your actual Render URL)*
+The last line should read `🎉 Smoke test passed completely! All core systems operational.` The test leaves a user with an email like `smoke_17...@devcollab.local` in your database; it's harmless.
 
-This script tests:
-1. Cloud health check `/readyz`
-2. User account creation & JWT cookie generation
-3. Workspace room creation
-4. Real-time WebSocket connection and collaborative CRDT room joining
-5. Graceful socket disconnect
+> It needs `backend/node_modules`. If it says it can't find `socket.io-client`, run `npm install` inside `backend` first (Part 2.1).
 
-When it outputs:
-```text
-🎉 Smoke test passed! Backend deployment is 100% healthy.
-```
-Your deployment is verified!
+### 8.2 Manual checklist in the browser
 
----
+Use **Chrome, Edge or Firefox** for this first test. Safari has a known limitation, explained in [Part 13](#part-13-limits-of-the-free-setup).
 
-## Part 8: Open and Enjoy Your App!
+| # | Do this | Expected |
+|---|---|---|
+| 1 | Open your Vercel URL | Landing page loads, with no red errors in DevTools (F12 → Console) |
+| 2 | Register with your **real** email | You're logged in |
+| 3 | Check your inbox (and **spam** folder) | A verification email arrives within a minute. Click the link: "email verified" |
+| 4 | Create a new room | The editor opens and shows code highlighting |
+| 5 | Type some code and wait 5 seconds, then **reload the page** | You're still logged in and the code is still there |
+| 6 | Open the same room URL in a **private/incognito window of a different browser** (e.g. Firefox if you used Chrome), or send an invite link to a friend | After the other person signs up and joins, you each see the other's typing and cursor live |
+| 7 | Add a comment on a line and click **Resolve** | The other window updates instantly |
+| 8 | Click **Run** on a small program | Output appears in the console drawer |
+| 9 | Log out, then click **Forgot password** | A reset email arrives; the link lets you set a new password |
+| 10 | Render → **Logs** | No repeated red `error` lines |
 
-1. Open your browser and navigate to your Vercel URL: `https://your-app-name.vercel.app`.
-2. Click **Register** and create an account.
-3. Click **New Workspace** to open a live editor room.
-4. Copy the URL and open it in an Incognito window (or send it to a friend).
-5. Watch your keystrokes, remote cursors, comments, and AI reviews synchronize live in real time!
+If all 10 pass, **your app is live.** 🎉
 
 ---
 
-## 💡 Beginner Troubleshooting & FAQ
+## Part 9: Optional: Google and GitHub sign-in
 
-### Q: Why does the app feel slow the first time I visit after a few hours?
-**A:** Render's free tier has an **inactivity sleep** feature: if no one visits the site for 15 minutes, Render pauses the server to save resources. When someone visits, it takes about **30 to 45 seconds** to "wake up" (a cold start). DevCollab has automatic retry logic built in, so once it wakes up, it stays fast and responsive.
+Skip this whole part if email + password login is enough for you. The **Continue with Google/GitHub** buttons just show an error until it's set up.
 
-### Q: I get a CORS error in my browser console when logging in.
-**A:** Check your Render environment variables. Ensure `CLIENT_URL` and `CLIENT_URLS` in Render exactly match your Vercel URL:
-- ✅ Correct: `https://my-app.vercel.app`
-- ❌ Incorrect: `https://my-app.vercel.app/` (no trailing slash)
-- ❌ Incorrect: `http://my-app.vercel.app` (must be `https`)
+Both providers need the exact **callback URL** of your backend:
 
-### Q: How do I update my app in the future when I make changes?
-**A:** Whenever you make new code changes, just run:
-```bash
-git add .
-git commit -m "Describe your changes"
+```
+Google:  https://YOUR-BACKEND.onrender.com/auth/google/callback
+GitHub:  https://YOUR-BACKEND.onrender.com/auth/github/callback
+```
+
+They also need `API_URL` to be set on Render (Part 5.5). It must match the start of these URLs exactly.
+
+### 9.1 GitHub (easier, about 3 minutes)
+
+1. Go to GitHub → profile picture → **Settings → Developer settings → OAuth Apps → New OAuth App**.
+2. Fill in:
+   - **Application name:** `DevCollab`
+   - **Homepage URL:** your FRONTEND URL
+   - **Authorization callback URL:** `https://YOUR-BACKEND.onrender.com/auth/github/callback`
+3. Click **Register application**.
+4. Copy the **Client ID**. Click **Generate a new client secret** and copy it. It's shown only once.
+5. On Render, add `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, then save and redeploy.
+
+> DevCollab only accepts GitHub accounts with a **verified** email address. That's a security rule, not a bug.
+
+### 9.2 Google (about 10 minutes)
+
+1. Go to **console.cloud.google.com**. Click the project dropdown at the top, then **New Project**, name it `DevCollab` and click **Create**. Make sure it's selected.
+2. Open the menu (☰) and go to **APIs & Services → OAuth consent screen**. Newer layouts call this **Google Auth Platform**; click **Get started**.
+   - App name: `DevCollab`. User support email: yours.
+   - Audience / User type: **External**.
+   - Contact email: yours. Accept the policy and click **Create**.
+3. Under **Audience**, the app starts in **Testing** mode. Only emails you add under **Test users** can sign in. Add your own email.
+   - When you're ready for everyone, click **Publish app**. Apps that only ask for name, email and profile picture normally don't need Google's review.
+4. Go to **Clients** (or **Credentials → Create Credentials → OAuth client ID**):
+   - Application type: **Web application**. Name: `DevCollab web`.
+   - **Authorized redirect URIs → Add URI:** `https://YOUR-BACKEND.onrender.com/auth/google/callback`
+   - You can leave "Authorized JavaScript origins" empty.
+   - Click **Create**.
+5. Copy the **Client ID** and **Client secret**.
+6. On Render, add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then save and redeploy.
+
+**Test:** on your site, click **Continue with Google**. You should come back logged in.
+
+The most common error is `redirect_uri_mismatch`. It means the URL in step 4 doesn't **exactly** match `API_URL` + `/auth/google/callback`. Check for `http` vs `https`, a typo in the name, or a trailing slash.
+
+---
+
+## Part 10: Optional: AI code review
+
+The **AI Review** button sends room code to an AI model. This **costs real money per request**: you pay the AI provider, not Render.
+
+1. Create an account at **console.anthropic.com**, add billing credit, then go to **API Keys → Create Key** and copy it.
+2. On Render, add:
+
+   | Key | Value | Notes |
+   |---|---|---|
+   | `AI_PROVIDER` | `anthropic` | (`openai` also works with an OpenAI key) |
+   | `AI_API_KEY` | your key | Secret. Never commit it |
+   | `AI_DAILY_REQUEST_LIMIT` | `20` | A hard cap per day for the whole server, so a bug or abuse can't run up a big bill |
+   | `AI_EFFORT` | `medium` | Optional. `high` (the default) gives more thorough reviews but uses more tokens; `low` is cheapest |
+
+3. Save and redeploy.
+
+The default model is `claude-opus-5-5`. You can set `AI_MODEL` to change it, but leave it unset unless you have a reason.
+
+Set a monthly **spend limit** in the Anthropic console (**Settings → Limits**) as a second safety net.
+
+---
+
+## Part 11: Updating the app later
+
+### 11.1 Normal workflow
+
+```powershell
+# make changes, then:
+git add -A
+git commit -m "Describe what you changed"
 git push origin main
 ```
-Both Render and Vercel will automatically detect the push and redeploy your latest changes with zero manual intervention!
+
+Render and Vercel both notice the push and redeploy automatically. The backend takes a few minutes and the frontend about 1 minute.
+
+> While Render swaps servers, people in a room may see "reconnecting" for a few seconds. Unsaved edits are flushed to the database before the old server stops.
+
+### 11.2 Changing settings
+
+- **Render env var:** Environment → edit → **Save, rebuild, and deploy**.
+- **Vercel env var:** Project → **Settings → Environment Variables** → edit. Then **Deployments** → the latest one → **⋯ → Redeploy**. This is required because `VITE_` values are built into the site.
+
+### 11.3 Rolling back a bad deploy
+
+- **Render:** **Events** (or **Deploys**) → find the last good deploy → **Rollback**.
+- **Vercel:** **Deployments** → last good one → **⋯ → Promote to Production** (or **Instant Rollback**).
+
+### 11.4 Backups
+
+The free M0 cluster does **not** include automatic backups. Once real users depend on the app, you have two options:
+- Upgrade the cluster (paid tiers include backups), or
+- Export now and then with `mongodump` (MongoDB Database Tools):
+  ```powershell
+  mongodump --uri "YOUR_MONGO_URI" --out "C:\Backups\devcollab-2026-11-15"
+  ```
+
+---
+
+## Part 12: Troubleshooting
+
+**First step for any problem:** Render → `devcollab-api` → **Logs**, plus the browser's **F12 → Console** and **Network** tabs. The error message almost always names the cause.
+
+### The backend won't start, or `/readyz` fails
+
+| Log message | Cause | Fix |
+|---|---|---|
+| `Environment validation failed: - JWT_ACCESS_SECRET: ...at least 32 characters` | Secret missing or too short | Generate it again (Part 1.3) |
+| `Environment validation failed: - MONGO_URI: ...` | Key misspelled or missing | It must be exactly `MONGO_URI` |
+| `bad auth : authentication failed` | Wrong DB user or password in the URI | Recheck Part 3.4; reset the user's password in Atlas if unsure |
+| `querySrv ENOTFOUND` / `ECONNREFUSED` | Typo in the cluster address | Copy the string from Atlas again |
+| `Server selection timed out` / `IP ... not whitelisted` | Atlas network access | Part 3.3: `0.0.0.0/0` must be **Active** |
+| Deploy fails at `Dockerfile not found` | Wrong paths | Dockerfile Path `./backend/Dockerfile`, context `./backend`, Root Directory empty |
+
+### Browser console says "CORS" or "CORS origin denied"
+
+`CLIENT_URLS` on Render doesn't match the address in the browser bar exactly.
+- ✅ `https://devcollab.vercel.app`
+- ❌ `https://devcollab.vercel.app/` (trailing slash)
+- ❌ `http://devcollab.vercel.app` (not https)
+- ❌ A Vercel *preview* URL instead of the production one
+
+Fix the value, then **Save, rebuild, and deploy**.
+
+### Requests go to `localhost:5000` or `undefined/users/login`
+
+`VITE_API_URL` was missing when Vercel built the site. Add it (Part 6.3), then **redeploy** (Part 11.2).
+
+### I log in, but I'm logged out again after reloading the page
+
+1. Check that `COOKIE_SAMESITE=none` and `NODE_ENV=production` are set on Render.
+2. Are you using **Safari**, or an **incognito** window? See [Part 13](#part-13-limits-of-the-free-setup).
+3. Chrome: check that third-party cookies aren't blocked under **Settings → Privacy → Third-party cookies**.
+
+### Emails never arrive
+
+1. Check your **spam** folder first.
+2. Render logs show `MAIL_TRANSPORT is not 'smtp' with SMTP_URL set`: one of the two is missing or blank.
+3. Logs show `Invalid login` / `535 Authentication failed`: you used the API key instead of the SMTP key, or forgot `%40` in the login (Part 4.3).
+4. Logs show `Connection timeout` / `ETIMEDOUT`: the port is not `2525`. Render's free tier blocks 25, 465 and 587.
+5. Logs show `sender not valid`: `MAIL_FROM` isn't a verified Brevo sender (Part 4.1).
+6. Brevo dashboard → **Transactional → Logs** shows whether Brevo received and delivered the email.
+
+### Everyone gets "Too many requests" right away
+
+`TRUST_PROXY` is missing on Render. Without it, every visitor appears to have the same IP address and shares one limit. Set `TRUST_PROXY=1` and redeploy.
+
+### The site is slow, or the first request takes 30–60 seconds
+
+That's the Render free tier waking up. See Part 13.
+
+### The editor area is blank
+
+Open F12 → Console. If you see `Refused to load the script ... cdn.jsdelivr.net`, the build didn't include the self-hosted editor files. Make sure `VITE_MONACO_BASE` is **not** set on Vercel, then redeploy.
+
+### "Live collaboration" doesn't sync between two windows
+
+- F12 → Network → **WS** tab: there should be a `socket.io` connection with status 101.
+- If it shows a CORS or 403 error, it's the same fix as the CORS section above.
+- If you're not logged in on both sides, check that the second account was actually invited to the room.
+
+---
+
+## Part 13: Limits of the free setup
+
+You should know these before you invite real users.
+
+| Limit | What happens | Fix when it matters |
+|---|---|---|
+| **Render sleeps after 15 min without traffic** | The first visitor afterwards waits 30–60 s while the server wakes up. Open rooms are saved before it sleeps, so no data is lost | Render **Starter** plan (~$7/month) stays on 24/7 |
+| **Render free: 512 MB RAM, 0.1 CPU** | Fine for a few dozen people at once, not hundreds | Upgrade the instance type |
+| **Safari and incognito windows** | Your frontend (`vercel.app`) and backend (`onrender.com`) are different websites, so the login cookie counts as a "third-party cookie". **Safari blocks these** (as do incognito windows in most browsers). Users can log in with email and password, but are **logged out when they reload the page or after 15 minutes**, and Google/GitHub sign-in fails | Buy a domain (~$10/year) and serve both from it, e.g. `app.mydomain.com` (Vercel) and `api.mydomain.com` (Render). Then the cookie is first-party. Steps: add both as custom domains in Vercel and Render, update `VITE_API_URL`, `API_URL`, `CLIENT_URL(S)` and the OAuth callback URLs, set `COOKIE_SAMESITE=lax`, and redeploy both |
+| **Atlas M0: 512 MB storage, no backups** | Plenty for a small group; no point-in-time restore | Upgrade the cluster, or run `mongodump` regularly (Part 11.4) |
+| **Brevo free: 300 emails/day** | Enough for sign-ups and resets of a small user base | Paid Brevo plan |
+| **Code "Run" uses the public Wandbox service** | Users' code is sent to a third party; don't run code that contains secrets | — |
+| **Update deploys sign nobody out, but *this* first deploy does** | Anyone who used an older version of the app has to log in once more | Nothing to fix |
+
+### Final checklist
+
+- [ ] Smoke test passes (Part 8.1)
+- [ ] All 10 manual checks pass (Part 8.2)
+- [ ] `TRUST_PROXY=1`, `MAIL_TRANSPORT=smtp`, `SMTP_URL`, `API_URL` and `COOKIE_SECRET` are set on Render
+- [ ] Your notes file is **outside** the project and not committed
+- [ ] (Optional) Google/GitHub sign-in works
+- [ ] (Optional) AI review works and a spend limit is set at the provider
+
+For the architecture and more advanced options (Docker Compose, Redis for multiple servers, monitoring), see [DEPLOYMENT.md](./DEPLOYMENT.md). For what each security setting does, see [SECURITY.md](./SECURITY.md).

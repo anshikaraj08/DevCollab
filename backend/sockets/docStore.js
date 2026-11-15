@@ -9,6 +9,8 @@ import {
 
 const SAVE_DELAY_MS = 2000;
 const IDLE_UNLOAD_MS = 30000;
+// How far before the resync cursor to re-read (covers ObjectId ordering skew between instances)
+const RESYNC_OVERLAP_MS = 120000;
 
 /**
  * Adapter that maintains legacy { loadRoom, saveRoom } compatibility for tests
@@ -228,6 +230,22 @@ export class DocStore {
     entry.idleTimer.unref?.();
   }
 
+  /** Forget a room entirely (it was deleted): no flush, no compaction. */
+  evict(roomId) {
+    const id = String(roomId);
+    const entry = this.entries.get(id);
+    if (entry) {
+      clearTimeout(entry.idleTimer);
+      this._stopResync(entry);
+      entry.doc.destroy();
+      this.entries.delete(id);
+      loadedRoomsGauge?.set?.(this.entries.size);
+    }
+    clearTimeout(this.savedTimers.get(id));
+    this.savedTimers.delete(id);
+    this.persistence.discard?.(id);
+  }
+
   async flush(roomId) {
     const id = String(roomId);
     const entry = this.entries.get(id);
@@ -339,7 +357,9 @@ export class DocStore {
     entry.resyncTimer = setInterval(async () => {
       if (!entry.doc || entry.refs <= 0) return;
       try {
-        const updates = await this.persistence.loadSince(entry.roomId, entry.lastSeenId);
+        const updates = await this.persistence.loadSince(entry.roomId, entry.lastSeenId, {
+          overlapMs: RESYNC_OVERLAP_MS,
+        });
         if (updates && updates.length > 0) {
           for (const u of updates) {
             const uBytes = new Uint8Array(u.update);
@@ -349,7 +369,7 @@ export class DocStore {
               Y.applyUpdate(entry.doc, uBytes, "sync");
               this.onServerUpdate?.(entry.roomId, u.update);
             }
-            entry.lastSeenId = u._id;
+            if (!entry.lastSeenId || String(u._id) > String(entry.lastSeenId)) entry.lastSeenId = u._id;
           }
         }
       } catch (err) {

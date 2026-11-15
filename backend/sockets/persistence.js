@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import mongoose from "mongoose";
 import Room from "../models/room.model.js";
 import YUpdate from "../models/yUpdate.model.js";
 
@@ -6,10 +7,16 @@ import YUpdate from "../models/yUpdate.model.js";
  * MongoDB Append-Only Update Log Persistence for Yjs CRDTs
  *
  * Adheres to the Stage 5 persistence specification:
- * - load(roomId): base yState + updates > compactedUntil
+ * - load(roomId): base yState + every update still in the log
  * - append(roomId, update): buffered and written every 500ms merged with Y.mergeUpdates
- * - compact(roomId): encodes full state, updates Room.compactedUntil, deletes applied updates <= compactedUntil
- * - loadSince(roomId, afterId): returns updates after afterId
+ * - compact(roomId): folds the log into Room.yState and deletes exactly the entries it folded in
+ * - loadSince(roomId, afterId): returns updates after afterId (optionally with a time overlap)
+ *
+ * ObjectIds from different server instances are not strictly ordered (they embed a
+ * per-machine random part and only second-level time), so no correctness decision
+ * here relies on "_id greater than X". Yjs updates are idempotent, so re-applying an
+ * update that is already part of yState is harmless; deleting one that is not would
+ * lose an edit.
  */
 export class MongoPersistence {
   constructor({
@@ -30,6 +37,8 @@ export class MongoPersistence {
     this.onSaved = null;      // (roomId, isoTime) => void
     this.onFlushed = null;    // (roomId, lastId) => void
     this.onCompacted = null;  // (roomId, details) => void
+    this.compacting = new Map(); // roomId -> Promise (serializes compactions in this process)
+    this.retryDelayMs = 1000;
   }
 
   /**
@@ -52,12 +61,9 @@ export class MongoPersistence {
       ytext.insert(0, room.code);
     }
 
-    // 2. Fetch and apply all log updates created after compactedUntil
-    const query = { room: id };
-    if (room.compactedUntil) {
-      query._id = { $gt: room.compactedUntil };
-    }
-    const updates = await this.yUpdateModel.find(query).sort({ _id: 1 });
+    // 2. Apply every update still in the log. Compaction deletes only entries it has
+    //    folded into yState, so anything left may be missing from it.
+    const updates = await this.yUpdateModel.find({ room: id }).sort({ _id: 1 });
 
     let lastSeenId = room.compactedUntil || null;
     for (const u of updates) {
@@ -132,9 +138,28 @@ export class MongoPersistence {
       this.onSaved?.(id, new Date().toISOString());
       return created;
     } catch (err) {
-      this.logger.error?.({ err: err.message, roomId: id }, "Failed to persist merged YUpdate");
+      // Put the edits back so they are retried instead of silently dropped.
+      const newer = this.buffers.get(id) || [];
+      this.buffers.set(id, [...pending, ...newer]);
+      if (!this.timers.has(id)) {
+        const retry = setTimeout(() => {
+          this.timers.delete(id);
+          this.flush(id).catch(() => {});
+        }, this.retryDelayMs);
+        retry.unref?.();
+        this.timers.set(id, retry);
+      }
+      this.logger.error?.({ err: err.message, roomId: id }, "Failed to persist merged YUpdate; will retry");
       throw err;
     }
+  }
+
+  /** Drop buffered edits and timers for a room that was deleted. */
+  discard(roomId) {
+    const id = String(roomId);
+    clearTimeout(this.timers.get(id));
+    this.timers.delete(id);
+    this.buffers.delete(id);
   }
 
   /**
@@ -148,64 +173,77 @@ export class MongoPersistence {
   /**
    * Compacts the update log for a room:
    * 1. Flushes any pending updates.
-   * 2. Loads base yState and all updates up to highest applied _id.
-   * 3. Writes Room.yState, Room.code, Room.compactedUntil = <highest applied id>.
-   * 4. Deletes YUpdates with _id <= compactedUntil.
-   * Invariant: Never removes an entry that has not been applied to the written state.
+   * 2. Rebuilds the state from Room.yState plus every log entry.
+   * 3. Writes Room.yState / code / compactedUntil, but only if no other compaction
+   *    wrote in between (optimistic check on Room.stateVersion).
+   * 4. Deletes exactly the log entries that were folded in.
+   * Invariant: never removes an entry that has not been applied to the written state.
    * @param {string} roomId
-   * @returns {Promise<{ compacted: boolean, count: number, compactedUntil?: any }>}
+   * @returns {Promise<{ compacted: boolean, count: number, compactedUntil?: any, reason?: string }>}
    */
   async compact(roomId) {
     const id = String(roomId);
+    // Serialize compactions of the same room inside this process
+    const previous = this.compacting.get(id) || Promise.resolve();
+    const run = previous.catch(() => {}).then(() => this._compact(id));
+    this.compacting.set(id, run);
+    try {
+      return await run;
+    } finally {
+      if (this.compacting.get(id) === run) this.compacting.delete(id);
+    }
+  }
 
-    // 1. Flush any pending memory buffers first
+  async _compact(id) {
     await this.flush(id);
 
-    // 2. Fetch room and updates
-    const room = await this.roomModel.findById(id).select("+yState code compactedUntil");
+    const room = await this.roomModel.findById(id).select("+yState code compactedUntil stateVersion");
     if (!room) return { compacted: false, count: 0 };
 
-    const query = { room: id };
-    if (room.compactedUntil) {
-      query._id = { $gt: room.compactedUntil };
-    }
-    const updates = await this.yUpdateModel.find(query).sort({ _id: 1 });
-
+    const updates = await this.yUpdateModel.find({ room: id }).sort({ _id: 1 });
     if (updates.length === 0) {
       return { compacted: false, count: 0, compactedUntil: room.compactedUntil };
     }
 
-    // 3. Rebuild complete state from base up to the last update in the batch
     const doc = new Y.Doc();
     const ytext = doc.getText("code");
-
     if (room.yState && room.yState.length > 0) {
       Y.applyUpdate(doc, new Uint8Array(room.yState));
     } else if (room.code) {
       ytext.insert(0, room.code);
     }
 
+    const appliedIds = [];
     let highestAppliedId = room.compactedUntil;
     for (const u of updates) {
       Y.applyUpdate(doc, new Uint8Array(u.update));
-      highestAppliedId = u._id;
+      appliedIds.push(u._id);
+      if (!highestAppliedId || String(u._id) > String(highestAppliedId)) highestAppliedId = u._id;
     }
 
     const encodedState = Buffer.from(Y.encodeStateAsUpdate(doc));
     const fullCode = ytext.toString();
+    doc.destroy();
 
-    // 4. Atomically persist compacted state and checkpoint into Room
-    await this.roomModel.findByIdAndUpdate(id, {
-      yState: encodedState,
-      code: fullCode,
-      compactedUntil: highestAppliedId,
-    });
+    // Only write if nobody else compacted since we read the room: another instance
+    // could otherwise overwrite a newer yState with this older one.
+    const version = room.stateVersion || 0;
+    const versionFilter =
+      version === 0
+        ? { $or: [{ stateVersion: 0 }, { stateVersion: { $exists: false } }, { stateVersion: null }] }
+        : { stateVersion: version };
+    const written = await this.roomModel.findOneAndUpdate(
+      { _id: id, ...versionFilter },
+      {
+        $set: { yState: encodedState, code: fullCode, compactedUntil: highestAppliedId, stateVersion: version + 1 },
+      },
+      { new: true }
+    );
+    if (!written) {
+      return { compacted: false, count: 0, reason: "CONCURRENT_COMPACTION" };
+    }
 
-    // 5. Delete only the updates that have been successfully applied to the written state
-    await this.yUpdateModel.deleteMany({
-      room: id,
-      _id: { $lte: highestAppliedId },
-    });
+    await this.yUpdateModel.deleteMany({ room: id, _id: { $in: appliedIds } });
 
     this.onCompacted?.(id, { count: updates.length, compactedUntil: highestAppliedId });
     return { compacted: true, count: updates.length, compactedUntil: highestAppliedId };
@@ -217,10 +255,18 @@ export class MongoPersistence {
    * @param {any} afterId
    * @returns {Promise<Array<YUpdate>>}
    */
-  async loadSince(roomId, afterId) {
+  async loadSince(roomId, afterId, { overlapMs = 0 } = {}) {
     const query = { room: String(roomId) };
     if (afterId) {
-      query._id = { $gt: afterId };
+      if (overlapMs > 0) {
+        // Re-read a time window before the cursor: entries written by another
+        // instance can carry a slightly lower _id than ones already seen.
+        const seenAt = new mongoose.Types.ObjectId(String(afterId)).getTimestamp().getTime();
+        const from = mongoose.Types.ObjectId.createFromTime(Math.floor((seenAt - overlapMs) / 1000));
+        query._id = { $gte: from };
+      } else {
+        query._id = { $gt: afterId };
+      }
     }
     return this.yUpdateModel.find(query).sort({ _id: 1 });
   }

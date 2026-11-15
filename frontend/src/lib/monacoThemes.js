@@ -47,7 +47,9 @@ export const defineThemes = (monaco) => {
         "editor.inactiveSelectionBackground": "#f1f5f9",
       },
     });
-  } catch (_) {}
+  } catch {
+    // themes already defined or Monaco not ready; the default theme is used
+  }
 };
 
 export const defineTheme = defineThemes;

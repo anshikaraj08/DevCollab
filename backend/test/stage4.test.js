@@ -137,7 +137,7 @@ describe("Stage 4: Comments v2 & Notifications Backend", () => {
 
       // Check emitted socket event
       const updatedEvent = emittedEvents.find(
-        (e) => e.event === "comment:updated" && e.target === String(testRoom._id)
+        (e) => e.event === "comment:updated" && e.target === `room:${testRoom._id}`
       );
       assert.ok(updatedEvent);
       assert.strictEqual(updatedEvent.payload.comment.text, "Updated comment text by editor");

@@ -11,6 +11,9 @@ export function getSocket() {
   socket = io(import.meta.env.VITE_API_URL, {
     autoConnect: false,
     withCredentials: true,
+    // WebSocket first: it needs no sticky sessions when several backend instances
+    // run behind a load balancer. Long-polling remains as a fallback.
+    transports: ["websocket", "polling"],
     auth: (send) => send({ token: getAccessToken() }),
   });
 

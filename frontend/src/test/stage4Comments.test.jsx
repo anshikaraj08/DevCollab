@@ -4,7 +4,6 @@ import { MemoryRouter } from "react-router-dom";
 import CommentPanel, { renderFormattedContent } from "../components/room/CommentPanel";
 import NotificationBell from "../components/notifications/NotificationBell";
 import api from "../config/axios";
-import * as socketConfig from "../config/socket";
 
 // Mock axios
 vi.mock("../config/axios", () => ({

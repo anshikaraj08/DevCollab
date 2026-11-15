@@ -153,6 +153,11 @@ export const acceptInvite = asyncHandler(async (req, res) => {
     return res.json({ room: roomObj, role: userRole, alreadyMember: true });
   }
 
+  // Check capacity before consuming one of the invite's uses
+  if ((preview.room.users || []).length >= MAX_ROOM_MEMBERS) {
+    throw new ApiError(409, `Workspace has reached the maximum capacity of ${MAX_ROOM_MEMBERS} members`);
+  }
+
   // Atomically increment uses if within limits
   const invite = await Invite.findOneAndUpdate(
     {

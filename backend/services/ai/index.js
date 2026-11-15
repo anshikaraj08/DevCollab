@@ -41,7 +41,7 @@ export function getAiConfig() {
     provider: provider || (testProviderOverride ? "mock" : null),
     model:
       model ||
-      (provider === "openai" ? "gpt-4o-mini" : "claude-3-5-sonnet-20241022"),
+      (provider === "openai" ? "gpt-4o-mini" : "claude-opus-5-5"),
     apiKey,
   };
 }
@@ -157,7 +157,7 @@ export async function reviewCode({ language = "javascript", code = "", focus = "
           systemPrompt,
           messages: [
             { role: "user", content: userPrompt },
-            { role: "assistant", content: rawText },
+            { role: "assistant", content: rawText || "(empty response)" },
             { role: "user", content: correctivePrompt },
           ],
         });
@@ -172,7 +172,7 @@ export async function reviewCode({ language = "javascript", code = "", focus = "
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
-            { role: "assistant", content: rawText },
+            { role: "assistant", content: rawText || "(empty response)" },
             { role: "user", content: correctivePrompt },
           ],
         });

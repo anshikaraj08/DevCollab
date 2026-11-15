@@ -24,12 +24,15 @@ if (import.meta.env.VITE_SENTRY_DSN) {
   });
 }
 
-// Self-hosted Monaco assets configuration:
-// When VITE_MONACO_BASE is provided (e.g. "/monaco"), load directly from self-hosted static files
-if (import.meta.env.VITE_MONACO_BASE) {
+// Self-hosted Monaco assets configuration.
+// `npm run build` copies Monaco into public/monaco, and the production CSP only
+// allows same-origin scripts, so production builds default to "/monaco".
+// In development an empty value falls back to the CDN.
+const monacoBase = import.meta.env.VITE_MONACO_BASE || (import.meta.env.PROD ? "/monaco" : "");
+if (monacoBase) {
   loader.config({
     paths: {
-      vs: `${import.meta.env.VITE_MONACO_BASE.replace(/\/+$/, "")}/vs`,
+      vs: `${monacoBase.replace(/\/+$/, "")}/vs`,
     },
   });
 }

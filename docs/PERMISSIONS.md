@@ -37,15 +37,16 @@ DevCollab enforces role-based access control (RBAC) across three membership role
 
 In addition to HTTP middleware (`roomAccess`), the Socket.IO and Yjs collaboration layer independently validates roles:
 1. **Viewers rejected on document updates:** Sockets with role `viewer` sending `yjs:update` events are ignored and receive `{ error: "READ_ONLY" }`.
-2. **Dynamic role transitions:** When an owner modifies a user's role or removes them via `PATCH /rooms/:roomId/members/:userId` or `DELETE /rooms/:roomId/members/:userId`, `io.syncRoomMembership(roomId)` pushes `room:role` or `room:removed` to live sockets immediately without requiring a browser reload.
+2. **Dynamic role transitions:** When an owner modifies a user's role or removes them via `PATCH /rooms/:roomId/members/:userId` or `DELETE /rooms/:roomId/members/:userId`, `io.syncRoomMembership(roomId)` re-checks every live socket in the room and pushes `room:role` or `room:removed` without a browser reload. In multi-instance mode each instance applies the change to its own sockets, so a demoted user is read-only on every server immediately.
 3. **Collaborative Undo Isolation:** `Y.UndoManager` scopes undo/redo exclusively to the local editor's origin. Viewers do not have undo stacks. When a snapshot restore occurs (`room:restored`), undo history is cleared across all participants to prevent re-inserting pre-restore contents.
-4. **Concurrent Connection Limits:** Each authenticated user is limited to 10 concurrent real-time sockets across rooms. Excess connections are rejected with `TOO_MANY`.
+4. **Concurrent Connection Limits:** Each authenticated user is limited to 10 concurrent real-time sockets per backend instance. Excess connections are rejected with `TOO_MANY`.
+5. **Room deletion:** deleting a room sends `room:removed` to everyone still connected and unloads the document on every instance.
 
 ---
 
 ## 3. Distributed Scale-Out & Notification RBAC (Phase 4)
 
-1. **Redis Pub/Sub Consistency:** In multi-instance deployments (`@socket.io/redis-adapter`), room broadcasts (`yjs:update`, `awareness:update`, `comment:*`, `room:restored`) travel through Redis channels. Each backend instance enforces the role matrix locally on connected sockets before emitting or accepting mutations.
+1. **Redis Pub/Sub Consistency:** In multi-instance deployments (`@socket.io/redis-adapter`), room broadcasts (`yjs:update`, `awareness:update`, `comment:*`, `room:restored`) travel through Redis channels. Each backend instance enforces the role matrix on its own connected sockets before accepting mutations, and membership changes are fanned out to all instances with `serverSideEmit`.
 2. **Private User Channels:** In-app notifications are routed strictly through private socket channels (`user:<userId>`). Other users in the same workspace room cannot subscribe to or intercept notifications intended for peers.
 3. **Mention Authorization:** The backend verifies that mentioned user handles correspond to active workspace members before generating notifications or dispatching email alerts.
 4. **Account Safety Guards:** Users cannot unlink their last remaining authentication method (e.g. unlinking password when no OAuth account is linked), preventing orphaned user accounts.

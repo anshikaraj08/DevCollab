@@ -13,7 +13,7 @@
 ### Free-Tier Hosting Specifications
 | Component | Provider | Free Tier Limits | Production Behaviors & Mitigations |
 |---|---|---|---|
-| **Backend API & WebSockets** | **Render** | 512 MB RAM, 0.1 CPU, spins down after 15 minutes of inactivity | **Cold Starts:** When inactive, the first request wakes the service in ~30–50s. DevCollab's frontend includes automatic retry with exponential backoff on both Axios and Socket.IO handshakes.<br>**WebSockets:** Render natively supports HTTP/1.1 WebSocket upgrades with persistent connections during active sessions. |
+| **Backend API & WebSockets** | **Render** | 512 MB RAM, 0.1 CPU, spins down after 15 minutes of inactivity | **Cold Starts:** When inactive, the first request wakes the service in ~30–50s. Socket.IO reconnects automatically once the service is up; the first HTTP request may time out and need a page refresh. A paid instance avoids sleeping.<br>**WebSockets:** Render natively supports HTTP/1.1 WebSocket upgrades with persistent connections during active sessions. |
 | **Frontend Static SPA** | **Vercel** | 100 GB bandwidth / month, global CDN edge network | Instant load times, automatic Brotli/gzip compression, and global edge caching for `/assets/` and self-hosted `/monaco/`. |
 | **Primary Database** | **MongoDB Atlas** | M0 Cluster (512 MB storage, shared RAM, replica set) | Fully managed TLS encryption in transit and rest. Adequate for hundreds of workspaces and thousands of version snapshots. |
 
@@ -62,13 +62,30 @@ Because the frontend runs on `https://<your-project>.vercel.app` and the backend
    | `PORT` | `5000` | Internal server port |
    | `NODE_ENV` | `production` | Production mode |
    | `MONGO_URI` | `mongodb+srv://...` (from Step A) | Atlas connection string |
-   | `JWT_ACCESS_SECRET` | *(Random 32+ characters)* | Token signing |
-   | `JWT_REFRESH_SECRET` | *(Random 32+ characters)* | Refresh token signing |
-   | `CLIENT_URL` | `https://<your-project>.vercel.app` (from Step C) | Primary frontend URL |
+   | `JWT_ACCESS_SECRET` | *(Random 32+ characters)* | Access-token signing |
+   | `COOKIE_SECRET` | *(Random 32+ characters)* | Signs the OAuth state cookie |
+   | `CLIENT_URL` | `https://<your-project>.vercel.app` (from Step C) | Frontend URL used in emails, invites and OAuth redirects |
    | `CLIENT_URLS` | `https://<your-project>.vercel.app` | Allowed CORS origins |
+   | `API_URL` | `https://devcollab-api.onrender.com` | This backend's public URL (OAuth callbacks) |
    | `COOKIE_SAMESITE` | `none` | Required for cross-site cookies |
-   | `TRUST_PROXY` | `1` | Reads real client IPs behind Render |
+   | `TRUST_PROXY` | `1` | **Required.** Without it every user shares one rate-limit bucket |
+   | `MAIL_TRANSPORT` | `smtp` | **Required for email.** Otherwise verification/reset emails are only logged |
+   | `SMTP_URL` | `smtp://user:pass@smtp-relay.brevo.com:2525` | Your SMTP provider (e.g. Brevo, Mailgun, SendGrid). **Render's free tier blocks ports 25, 465 and 587**; use port 2525 there. URL-encode `@` in the login as `%40` |
+   | `MAIL_FROM` | `DevCollab <noreply@yourdomain>` | Sender address your SMTP provider allows |
    | `APP_VERSION` | `1.0.0` | Sentry & release version |
+
+   Optional:
+   | Key | Value | Purpose |
+   |---|---|---|
+   | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | from Google Cloud Console | Google sign-in. Authorized redirect URI: `<API_URL>/auth/google/callback` |
+   | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | from GitHub OAuth Apps | GitHub sign-in. Callback URL: `<API_URL>/auth/github/callback` |
+   | `AI_PROVIDER` / `AI_API_KEY` | `anthropic` or `openai` + key | Enables AI review (default models `claude-opus-5-5` / `gpt-4o-mini`; override with `AI_MODEL`) |
+   | `SENTRY_DSN` | Sentry project DSN | Error reporting |
+   | `METRICS_TOKEN` | random string | Enables `/metrics` behind `Authorization: Bearer <token>` |
+
+   `JWT_REFRESH_SECRET` is no longer needed (refresh tokens are server-side sessions); an existing value is harmless.
+
+   The repository's `render.yaml` blueprint lists the same variables and can create the service for you.
 7. Click **Create Web Service**. Render will build the Docker container and start the service.
 8. Once built, copy your backend URL: `https://devcollab-api.onrender.com`.
 
@@ -86,7 +103,7 @@ Because the frontend runs on `https://<your-project>.vercel.app` and the backend
    | Key | Value |
    |---|---|
    | `VITE_API_URL` | `https://devcollab-api.onrender.com` (your Render URL from Step B) |
-   | `VITE_MONACO_BASE` | `/monaco` (self-hosted assets) |
+   | `VITE_MONACO_BASE` | `/monaco` (optional — production builds default to the self-hosted copy) |
 5. Click **Deploy**. Vercel will build and assign you a free URL: `https://your-project.vercel.app`.
 6. *(Important)* Copy this Vercel URL, go back to Render, and set `CLIENT_URL` and `CLIENT_URLS` to this exact URL.
 
@@ -121,6 +138,8 @@ The script will assert:
 * **Vercel:** In the Vercel dashboard, go to **Deployments** → Select the previous successful deployment → Click **Promote to Production**.
 
 ### Common Troubleshooting
+* **Emails never arrive:** check the logs for "MAIL_TRANSPORT is not 'smtp'" and set `MAIL_TRANSPORT=smtp` plus `SMTP_URL`.
+* **Users signed out after deploying this version:** expected once — refresh tokens moved from JWTs to server-side sessions, so old cookies are rejected and users sign in again.
 * **CORS Errors (`403 CORS origin denied`):** Ensure `CLIENT_URLS` in Render exactly matches the frontend URL (e.g. `https://your-project.vercel.app`, without trailing slashes).
 * **Login Fails on Refresh (Missing Cookies):** Verify `COOKIE_SAMESITE=none` is set in Render environment variables. Cross-site cookies between `.onrender.com` and `.vercel.app` require `SameSite=None; Secure`.
 * **Render Cold Start Delay:** When accessing after 15 minutes of inactivity, wait 30 seconds for the container to wake up. Check `https://<backend>.onrender.com/readyz` in your browser to confirm readiness.
@@ -137,8 +156,8 @@ DevCollab supports horizontal multi-instance scale-out across multiple backend c
 3. **Replica Updates Pub/Sub (`devcollab:replica:updates`):** Live CRDT edits are published across instances and applied in memory with origin `"redis"`.
 4. **30-Second Resync Poll:** Each loaded document polls `persistence.loadSince(roomId, lastSeenId)` every 30 seconds as an automated safety net against dropped pub/sub packets.
 5. **Compaction Lease (`compact:<roomId>`):** Distributed Redis mutex with a 30s TTL prevents duplicate compaction runs across replicas.
-6. **No Sticky Sessions Requirement:** Application convergence does not require sticky sessions because any instance can serve any user and load any document from the durable log.
-   > **Transport Upgrade Note:** Socket.IO by default starts with HTTP long-polling and upgrades to WebSocket. If deploying behind a load balancer without sticky sessions, configure the client with `transports: ["websocket"]` to connect directly without polling handshake splits.
+6. **Sticky sessions:** document convergence does not need them, because any instance can load any document from the durable log. The frontend connects over WebSocket first, which works without sticky sessions; only the long-polling fallback (used when WebSockets are blocked) needs them.
+7. **Shared state:** HTTP rate limits are stored in Redis and shared by all instances. Role changes, member removals and room deletions are applied on every instance. The 10-sockets-per-user cap is per instance.
 
 ### Running Two Replicas Locally with Docker Compose
 To run MongoDB, Redis, and two backend replicas alongside the frontend:
@@ -155,5 +174,6 @@ docker compose --profile scale-out up --build
 2. Copy the `rediss://...` connection URI.
 3. Add `REDIS_URL` to your backend environment variables in Render (or replica containers).
 4. The backend automatically activates Redis pub/sub, the Socket.IO Redis adapter, and Redis-backed rate limiting.
+5. Upstash's free tier allows 10,000 commands/day, which an active deployment exceeds quickly (every edit is published). Use a paid plan for real traffic.
 
 

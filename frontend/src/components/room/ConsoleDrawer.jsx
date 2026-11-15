@@ -53,7 +53,9 @@ export default function ConsoleDrawer({
     setStdin(val);
     try {
       localStorage.setItem(`devcollab:stdin:${roomId}`, val);
-    } catch {}
+    } catch {
+      // storage unavailable (private mode / quota): stdin still works for this session
+    }
   };
 
   // Debounced auto-save of test cases

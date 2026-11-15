@@ -1,13 +1,13 @@
 
 import { render, screen } from "@testing-library/react";
-import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Landing from "../screens/Landing";
 import Login from "../screens/Login";
 import Register from "../screens/Register";
 import Invite from "../screens/Invite";
 import Room from "../screens/Room";
 import { ThemeProvider } from "../context/theme.context";
-import { UserContext, UserProvider } from "../context/user.context";
+import { UserContext } from "../context/user.context";
 import ToastProvider from "../components/ui/Toast";
 import ErrorBoundary from "../components/ErrorBoundary";
 import api from "../config/axios";

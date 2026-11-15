@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../config/axios";
-import { getSocket, connectSocket } from "../../config/socket";
+import { connectSocket } from "../../config/socket";
 import Avatar from "../ui/Avatar";
 import { cn } from "../../lib/cn";
 

@@ -32,7 +32,6 @@ function MentionComposer({
   onSubmit,
   onCancel,
   placeholder,
-  submitLabel = "Send",
   submitting = false,
   members = [],
   onMentionsChange,
@@ -131,7 +130,7 @@ function MentionComposer({
 
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      onSubmit?.();
+      if (!submitting) onSubmit?.();
       return;
     }
 

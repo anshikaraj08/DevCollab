@@ -8,9 +8,9 @@ export const envSchema = z.object({
   JWT_ACCESS_SECRET: z
     .string({ required_error: "JWT_ACCESS_SECRET is required" })
     .min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
-  JWT_REFRESH_SECRET: z
-    .string({ required_error: "JWT_REFRESH_SECRET is required" })
-    .min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
+  // Legacy: refresh tokens are now opaque server-side sessions (utils/sessions.js).
+  // Still validated when present so old deployments keep booting unchanged.
+  JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters").optional(),
   CLIENT_URL: z.string().default("http://localhost:5173"),
   CLIENT_URLS: z.string().optional(),
   COOKIE_DOMAIN: z.string().optional(),
@@ -30,6 +30,7 @@ export const envSchema = z.object({
   AI_PROVIDER: z.enum(["anthropic", "openai"]).optional(),
   AI_MODEL: z.string().optional(),
   AI_API_KEY: z.string().optional(),
+  AI_EFFORT: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
   AI_DAILY_REQUEST_LIMIT: z.coerce.number().default(100).optional(),
   REDIS_URL: z.string().optional(),
 });
@@ -47,6 +48,12 @@ export function getAllowedOrigins(raw = process.env) {
 }
 
 export function validateEnv(raw = process.env) {
+  // Treat blank values (e.g. `AI_PROVIDER=` in .env or an empty dashboard field) as unset,
+  // so optional enums do not fail validation at boot.
+  const present = Object.fromEntries(
+    Object.entries(raw).filter(([, v]) => !(typeof v === "string" && v.trim() === ""))
+  );
+  raw = present;
   const merged = {
     ...raw,
     MONGO_URI: raw.MONGO_URI || raw.MONGODB_URI,
@@ -72,7 +79,7 @@ try {
   process.env.MONGODB_URI = env.MONGO_URI;
   process.env.JWT_ACCESS_SECRET = env.JWT_ACCESS_SECRET;
   process.env.JWT_SECRET = env.JWT_ACCESS_SECRET;
-  process.env.JWT_REFRESH_SECRET = env.JWT_REFRESH_SECRET;
+  if (env.JWT_REFRESH_SECRET) process.env.JWT_REFRESH_SECRET = env.JWT_REFRESH_SECRET;
   process.env.CLIENT_URL = env.CLIENT_URL;
   if (env.CLIENT_URLS) process.env.CLIENT_URLS = env.CLIENT_URLS;
   if (env.TRUST_PROXY !== undefined) process.env.TRUST_PROXY = String(env.TRUST_PROXY);

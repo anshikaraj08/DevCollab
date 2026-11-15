@@ -13,7 +13,11 @@
  *   API_URL=http://localhost:5000 node scripts/smoke.mjs
  */
 
-import { io } from "socket.io-client";
+import { createRequire } from "node:module";
+
+// The repo root has no package.json; resolve socket.io-client from the backend's dependencies.
+const requireFromBackend = createRequire(new URL("../backend/package.json", import.meta.url));
+const { io } = requireFromBackend("socket.io-client");
 
 const API_URL = (process.env.API_URL || "http://localhost:5000").replace(/\/+$/, "");
 const TEST_EMAIL = process.env.SMOKE_EMAIL || `smoke_${Date.now()}@devcollab.local`;
@@ -89,7 +93,7 @@ async function runSmokeTest() {
   if (!roomRes.ok) {
     throw new Error(`Room creation failed with HTTP ${roomRes.status}`);
   }
-  const room = await roomRes.json();
+  const { room } = await roomRes.json();
   const roomId = room._id || room.id;
   console.log(`  ✓ Created room ${roomId} (${room.title})`);
 

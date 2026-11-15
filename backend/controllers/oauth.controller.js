@@ -4,7 +4,7 @@ import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import logger from "../utils/logger.js";
-import { setRefreshCookie } from "../utils/cookies.js";
+import { issueSession, findActiveSession, revokeAllSessions } from "../utils/sessions.js";
 import { getOAuthProvider } from "../services/oauth/index.js";
 import env from "../config/env.js";
 
@@ -37,10 +37,8 @@ export const startOAuth = asyncHandler(async (req, res) => {
       } catch {}
     }
     if (!linkUserId && req.cookies?.refreshToken) {
-      try {
-        const decoded = jwt.verify(req.cookies.refreshToken, process.env.JWT_REFRESH_SECRET);
-        linkUserId = decoded.id;
-      } catch {}
+      const session = await findActiveSession(req.cookies.refreshToken);
+      if (session) linkUserId = String(session.user);
     }
     if (!linkUserId) {
       throw new ApiError(401, "You must be signed in to link an OAuth account");
@@ -176,7 +174,7 @@ export const handleOAuthCallback = asyncHandler(async (req, res) => {
     if (existingOtherUser) {
       if (String(existingOtherUser._id) === String(currentUser._id)) {
         // Already linked to this user
-        setRefreshCookie(res, currentUser.generateRefreshToken());
+        await issueSession(res, currentUser, req);
         return res.redirect(`${clientUrl}/auth/callback?next=/settings`);
       }
       // Rule 6: Link request while logged in, identity linked to another account -> Refuse
@@ -193,7 +191,7 @@ export const handleOAuthCallback = asyncHandler(async (req, res) => {
       currentUser.avatarUrl = profile.avatarUrl;
     }
     await currentUser.save();
-    setRefreshCookie(res, currentUser.generateRefreshToken());
+    await issueSession(res, currentUser, req);
     return res.redirect(`${clientUrl}/auth/callback?next=/settings`);
   }
 
@@ -205,7 +203,7 @@ export const handleOAuthCallback = asyncHandler(async (req, res) => {
   });
 
   if (user) {
-    setRefreshCookie(res, user.generateRefreshToken());
+    await issueSession(res, user, req);
     return res.redirect(`${clientUrl}/auth/callback?next=${encodeURIComponent(nextTarget)}`);
   }
 
@@ -222,7 +220,7 @@ export const handleOAuthCallback = asyncHandler(async (req, res) => {
       avatarUrl: profile.avatarUrl,
       tokenVersion: 0,
     });
-    setRefreshCookie(res, user.generateRefreshToken());
+    await issueSession(res, user, req);
     return res.redirect(`${clientUrl}/auth/callback?next=${encodeURIComponent(nextTarget)}`);
   }
 
@@ -233,7 +231,7 @@ export const handleOAuthCallback = asyncHandler(async (req, res) => {
       existingEmailUser.avatarUrl = profile.avatarUrl;
     }
     await existingEmailUser.save();
-    setRefreshCookie(res, existingEmailUser.generateRefreshToken());
+    await issueSession(res, existingEmailUser, req);
     return res.redirect(`${clientUrl}/auth/callback?next=${encodeURIComponent(nextTarget)}`);
   }
 
@@ -242,12 +240,14 @@ export const handleOAuthCallback = asyncHandler(async (req, res) => {
   existingEmailUser.password = undefined;
   existingEmailUser.tokenVersion = (existingEmailUser.tokenVersion || 0) + 1;
   existingEmailUser.emailVerified = true;
+  // Sign out whoever registered this unverified email with a password
+  await revokeAllSessions(existingEmailUser._id);
   existingEmailUser.providers.push({ provider, providerId: profile.providerId });
   if (!existingEmailUser.avatarUrl && profile.avatarUrl) {
     existingEmailUser.avatarUrl = profile.avatarUrl;
   }
   await existingEmailUser.save();
-  setRefreshCookie(res, existingEmailUser.generateRefreshToken());
+  await issueSession(res, existingEmailUser, req);
   return res.redirect(`${clientUrl}/auth/callback?next=${encodeURIComponent(nextTarget)}`);
 });
 

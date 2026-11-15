@@ -1,6 +1,7 @@
 import Comment from "../models/comment.model.js";
 import User from "../models/user.model.js";
 import Room from "../models/room.model.js";
+import { roomKey } from "../sockets/roomKey.js";
 import ApiError from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { getRole, can } from "../utils/roles.js";
@@ -69,7 +70,7 @@ export const addComment = asyncHandler(async (req, res) => {
   await comment.populate("mentions", "name email avatarUrl");
 
   const io = req.app.get("io");
-  io?.to(String(roomId)).emit("comment:new", { comment });
+  io?.to(roomKey(roomId)).emit("comment:new", { comment });
 
   // Deliver notifications to mentioned room members
   if (validMentions.length > 0) {
@@ -128,7 +129,7 @@ export const updateComment = asyncHandler(async (req, res) => {
   await comment.populate("mentions", "name email avatarUrl");
 
   const io = req.app.get("io");
-  io?.to(String(comment.roomId)).emit("comment:updated", { comment });
+  io?.to(roomKey(comment.roomId)).emit("comment:updated", { comment });
 
   if (newMentionsToNotify.length > 0) {
     await notifyMentions({
@@ -157,7 +158,7 @@ export const resolveComment = asyncHandler(async (req, res) => {
   comment.resolved = true;
   await comment.save();
 
-  req.app.get("io")?.to(String(comment.roomId)).emit("comment:resolved", { commentId: comment._id, resolved: true });
+  req.app.get("io")?.to(roomKey(comment.roomId)).emit("comment:resolved", { commentId: comment._id, resolved: true });
   res.json({ comment });
 });
 
@@ -175,7 +176,7 @@ export const unresolveComment = asyncHandler(async (req, res) => {
   comment.resolved = false;
   await comment.save();
 
-  req.app.get("io")?.to(String(comment.roomId)).emit("comment:resolved", { commentId: comment._id, resolved: false });
+  req.app.get("io")?.to(roomKey(comment.roomId)).emit("comment:resolved", { commentId: comment._id, resolved: false });
   res.json({ comment });
 });
 
@@ -206,7 +207,7 @@ export const addReply = asyncHandler(async (req, res) => {
   await comment.save();
 
   const io = req.app.get("io");
-  io?.to(String(comment.roomId)).emit("comment:reply", { comment });
+  io?.to(roomKey(comment.roomId)).emit("comment:reply", { comment });
 
   // 1. Notify mentioned users in reply
   if (validMentions.length > 0) {
@@ -249,6 +250,6 @@ export const deleteComment = asyncHandler(async (req, res) => {
   }
 
   await Comment.findByIdAndDelete(req.params.commentId);
-  req.app.get("io")?.to(String(comment.roomId)).emit("comment:deleted", { commentId: comment._id });
+  req.app.get("io")?.to(roomKey(comment.roomId)).emit("comment:deleted", { commentId: comment._id });
   res.json({ ok: true });
 });

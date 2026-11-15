@@ -15,7 +15,7 @@ import {
 
 const snapshotRateLimiter = createRateLimiter({
   ...RATE_LIMITS.snapshots,
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyType: "user",
 });
 
 const router = Router({ mergeParams: true });

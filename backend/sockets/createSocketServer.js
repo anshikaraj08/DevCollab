@@ -271,42 +271,88 @@ export function createSocketServer(httpServer, deps) {
     });
   });
 
+  /** Live sockets on THIS instance that have joined the room (real Socket objects, not copies). */
+  const localSocketsInRoom = (roomId) => {
+    const ids = io.of("/").adapter.rooms.get(roomKey(roomId));
+    if (!ids) return [];
+    return [...ids].map((id) => io.sockets.sockets.get(id)).filter(Boolean);
+  };
+
+  const detachLocalSocket = async (s, roomId, event) => {
+    const info = s.data?.awareness?.[roomId];
+    if (info) {
+      delete s.data.awareness[roomId];
+      io.to(roomKey(roomId)).emit("awareness:remove", { roomId, clientId: info.clientId });
+    }
+    s.emit(event, { roomId });
+    const wasJoined = s.data.rooms?.delete(roomId);
+    delete s.data.roles?.[roomId];
+    await s.leave(roomKey(roomId));
+    if (wasJoined) await store.release(roomId);
+  };
+
+  // Re-check membership and role for this instance's sockets. Each instance must do
+  // this itself: socket.data on a RemoteSocket is only a copy, so changing it from
+  // another instance would not stop a demoted or removed user from editing.
+  const syncLocalMembership = async (roomId) => {
+    for (const s of localSocketsInRoom(roomId)) {
+      const room = await getRoomForMember(roomId, s.data.user.id);
+      if (!room) {
+        logger.info({ userId: s.data.user.id, roomId }, "Socket removed from room via sync");
+        await detachLocalSocket(s, roomId, "room:removed");
+      } else if (s.data.roles[roomId] !== room.role) {
+        logger.info(
+          { userId: s.data.user.id, roomId, oldRole: s.data.roles[roomId], newRole: room.role },
+          "Socket role updated via sync"
+        );
+        s.data.roles[roomId] = room.role;
+        s.emit("room:role", { roomId, role: room.role });
+      }
+    }
+  };
+
+  // Disconnect everyone from a room that no longer exists and unload its document.
+  const closeLocalRoom = async (roomId) => {
+    // Unload first so detaching sockets cannot flush edits for a deleted room
+    store.evict?.(roomId);
+    for (const s of localSocketsInRoom(roomId)) {
+      await detachLocalSocket(s, roomId, "room:removed");
+    }
+  };
+
+  const SYNC_EVENT = "devcollab:syncMembership";
+  const CLOSE_EVENT = "devcollab:closeRoom";
+  const clustered = Boolean(redisClients?.pubClient && redisClients?.subClient);
+  if (clustered) {
+    io.on(SYNC_EVENT, (roomId) => {
+      syncLocalMembership(String(roomId)).catch((err) =>
+        logger.error({ err, roomId }, "syncRoomMembership (remote) error"));
+    });
+    io.on(CLOSE_EVENT, (roomId) => {
+      closeLocalRoom(String(roomId)).catch((err) =>
+        logger.error({ err, roomId }, "closeRoom (remote) error"));
+    });
+  }
+
   // Synchronize room membership across all instances
   io.syncRoomMembership = async (roomId) => {
+    const id = String(roomId);
     try {
-      const socketsInRoom = await io.in(roomKey(roomId)).fetchSockets();
-      for (const s of socketsInRoom) {
-        const room = await getRoomForMember(roomId, s.data.user.id);
-        if (!room) {
-          logger.info({ userId: s.data.user.id, roomId }, "Socket removed from room via sync");
-          s.emit("room:removed", { roomId });
-          const info = s.data?.awareness?.[roomId];
-          if (info) {
-            if (s.data?.awareness) delete s.data.awareness[roomId];
-            io.to(roomKey(roomId)).emit("awareness:remove", { roomId, clientId: info.clientId });
-          }
-          await s.leave(roomKey(roomId));
-
-          const local = io.sockets.sockets.get(s.id);
-          if (local) {
-            local.data.rooms?.delete(roomId);
-            delete local.data.roles?.[roomId];
-            await store.release(roomId);
-          }
-        } else {
-          s.data.roles = s.data.roles || {};
-          if (s.data.roles[roomId] !== room.role) {
-            logger.info(
-              { userId: s.data.user.id, roomId, oldRole: s.data.roles[roomId], newRole: room.role },
-              "Socket role updated via sync"
-            );
-            s.data.roles[roomId] = room.role;
-            s.emit("room:role", { roomId, role: room.role });
-          }
-        }
-      }
+      if (clustered) io.serverSideEmit(SYNC_EVENT, id);
+      await syncLocalMembership(id);
     } catch (err) {
-      logger.error({ err, roomId }, "syncRoomMembership error");
+      logger.error({ err, roomId: id }, "syncRoomMembership error");
+    }
+  };
+
+  // Called after a room is deleted
+  io.closeRoom = async (roomId) => {
+    const id = String(roomId);
+    try {
+      if (clustered) io.serverSideEmit(CLOSE_EVENT, id);
+      await closeLocalRoom(id);
+    } catch (err) {
+      logger.error({ err, roomId: id }, "closeRoom error");
     }
   };
 

@@ -9,6 +9,8 @@ describe("Rate Limiter Middleware", () => {
 
   before(async () => {
     db = await setupTestDb();
+    // Production runs behind one trusted proxy hop (TRUST_PROXY=1 on Render).
+    app.set("trust proxy", 1);
   });
 
   after(async () => {
@@ -41,5 +43,18 @@ describe("Rate Limiter Middleware", () => {
       "Response message should mention rate limit"
     );
   });
-});
 
+  test("rotating a spoofed X-Forwarded-For prefix does not bypass the limit", async () => {
+    // The trusted proxy appends the real client address as the last hop.
+    const realIp = "203.0.113.77";
+    let limited = false;
+    for (let i = 1; i <= 11; i++) {
+      const res = await request(app)
+        .post("/users/login")
+        .set("X-Forwarded-For", `10.${i}.${i}.${i}, ${realIp}`)
+        .send({ email: `spoof_${i}@example.com`, password: "wrongpassword" });
+      if (res.status === 429) limited = true;
+    }
+    assert.equal(limited, true, "Spoofed leading X-Forwarded-For entries must not create new buckets");
+  });
+});

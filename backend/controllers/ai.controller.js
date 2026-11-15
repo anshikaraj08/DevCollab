@@ -1,6 +1,7 @@
 import AiReview from "../models/aiReview.model.js";
 import { reviewCode, isAiConfigured, getAiConfig } from "../services/ai/index.js";
 import { redactSecrets } from "../utils/secretRedactor.js";
+import { roomKey } from "../sockets/roomKey.js";
 import ApiError from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -90,7 +91,7 @@ export const requestReview = asyncHandler(async (req, res) => {
 
   // Broadcast ai:changed socket notification
   const io = req.app.get("io");
-  io?.to(String(req.room._id)).emit("ai:changed", { reviewId: review._id });
+  io?.to(roomKey(req.room._id)).emit("ai:changed", { reviewId: review._id });
 
   res.status(201).json({ review });
 });
@@ -150,7 +151,7 @@ export const deleteReview = asyncHandler(async (req, res) => {
   await review.deleteOne();
 
   const io = req.app.get("io");
-  io?.to(String(req.room._id)).emit("ai:changed", { deletedId: id });
+  io?.to(roomKey(req.room._id)).emit("ai:changed", { deletedId: id });
 
   res.status(200).json({ message: "Review deleted successfully" });
 });

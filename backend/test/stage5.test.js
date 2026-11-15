@@ -668,6 +668,25 @@ describe("Stage 5: Scale-out with Redis & Append-Only Log Persistence", () => {
       const newRole = await roleUpdatePromise;
       assert.equal(newRole, "viewer");
 
+      // The demotion must be enforced on Instance 2, not only announced
+      const readOnlyPromise = new Promise((resolve) => {
+        client2.on("room:error", (e) => {
+          if (e.error === "READ_ONLY") resolve(e);
+        });
+      });
+      const probe = new Y.Doc();
+      probe.getText("code").insert(0, "x");
+      client2.emit("yjs:update", {
+        roomId: String(testRoom._id),
+        update: Y.encodeStateAsUpdate(probe),
+      });
+      const rejected = await readOnlyPromise;
+      assert.equal(rejected.error, "READ_ONLY");
+
+      // Restore editor role for later tests
+      testRoom.roles.delete(String(testUserB._id));
+      await testRoom.save();
+
       client2.disconnect();
     });
 

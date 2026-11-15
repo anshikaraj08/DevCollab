@@ -46,18 +46,6 @@ userSchema.methods.generateAccessToken = function () {
   );
 };
 
-// Long-lived token, stored in an HTTP-only cookie, used only to get new access tokens
-userSchema.methods.generateRefreshToken = function () {
-  return jwt.sign(
-    {
-      id: this._id,
-      tokenVersion: this.tokenVersion ?? 0,
-    },
-    process.env.JWT_REFRESH_SECRET,
-    {
-      expiresIn: "7d",
-    }
-  );
-};
+// Refresh tokens are opaque, server-side sessions: see utils/sessions.js
 
 export default mongoose.model("User", userSchema);
