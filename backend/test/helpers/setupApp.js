@@ -29,7 +29,16 @@ export async function setupTestDb() {
   }
 
   let uri = process.env.MONGO_URI_TEST;
-  if (!uri) {
+  let ownDatabase = false;
+  if (uri) {
+    // `node --test` runs test files in parallel processes. On a shared server (CI),
+    // give each process its own database so one file's clear() cannot wipe another's data.
+    const parsed = new URL(uri);
+    const base = parsed.pathname.replace(/^\//, "") || "devcollab_test";
+    parsed.pathname = `/${base}_${process.pid}`;
+    uri = parsed.toString();
+    ownDatabase = true;
+  } else {
     const { MongoMemoryServer } = await import("mongodb-memory-server");
     mongod = await MongoMemoryServer.create();
     uri = mongod.getUri();
@@ -45,6 +54,9 @@ export async function setupTestDb() {
   return {
     async teardown() {
       if (mongoose.connection.readyState !== 0) {
+        if (ownDatabase) {
+          await mongoose.connection.dropDatabase().catch(() => {});
+        }
         await mongoose.disconnect();
       }
       if (mongod) {
