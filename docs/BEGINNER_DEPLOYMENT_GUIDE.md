@@ -203,7 +203,7 @@ Render's free tier has no fixed IP address, so Atlas must accept connections fro
    ```
    mongodb+srv://devcollab_app:<db_password>@cluster0.ab1cd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
    ```
-3. Edit it in your notes:
+3. Edit it in your note
    - Replace `<db_password>` (including the `< >`) with the password from 3.2.
    - Add the database name `devcollab` between `.net/` and `?`.
 

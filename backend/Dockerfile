@@ -17,17 +17,9 @@ ENV PORT=5000
 # Copy production dependencies and application sources
 COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
-COPY app.js server.js ./
-COPY config ./config
-COPY controllers ./controllers
-COPY db ./db
-COPY middleware ./middleware
-COPY models ./models
-COPY routes ./routes
-COPY scripts ./scripts
-COPY services ./services
-COPY sockets ./sockets
-COPY utils ./utils
+# Copy the whole backend; .dockerignore keeps out node_modules, tests and .env files.
+# (Listing folders one by one previously left out validators/ and crashed on boot.)
+COPY . .
 
 # Run as non-root user for security
 USER node

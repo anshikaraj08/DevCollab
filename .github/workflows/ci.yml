@@ -67,3 +67,9 @@ jobs:
       - name: Build frontend
         run: npm --prefix frontend run build
 
+      # Catches files missing from the production image (Render deploys this Dockerfile)
+      - name: Build backend Docker image and load its modules
+        run: |
+          docker build -t devcollab-backend-ci backend
+          docker run --rm -e NODE_ENV=test devcollab-backend-ci node --input-type=module -e "await import('./app.js'); await import('./sockets/createSocketServer.js'); await import('./services/digest.service.js'); console.log('image modules ok'); process.exit(0)"
+
