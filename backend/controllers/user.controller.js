@@ -205,7 +205,14 @@ export const requestEmailVerification = asyncHandler(async (req, res) => {
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
 
-  await sendVerificationEmail({ to: user.email, name: user.name, token: rawToken });
+  try {
+    await sendVerificationEmail({ to: user.email, name: user.name, token: rawToken });
+  } catch (err) {
+    // SMTP problems (bad credentials, blocked port, unverified sender) end up here.
+    // Log the real reason for the operator; tell the user plainly instead of a generic 500.
+    logger.error({ err: err.message, code: err.code, userId: user._id }, "Failed to send verification email");
+    throw new ApiError(502, "We couldn't send the verification email right now. Please try again in a few minutes.");
+  }
   res.json({ message: "Verification email sent. Please check your inbox." });
 });
 

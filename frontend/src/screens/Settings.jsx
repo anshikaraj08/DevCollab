@@ -4,7 +4,6 @@ import api, { setAccessToken } from "../config/axios";
 import getErrorMessage from "../config/getErrorMessage";
 import { UserContext } from "../context/user.context";
 import { useToast } from "../components/ui/Toast";
-import AppLayout from "../components/layout/AppLayout";
 import Avatar from "../components/ui/Avatar";
 
 export default function Settings() {
@@ -162,7 +161,7 @@ export default function Settings() {
   const hasGitHub = user?.providers?.includes("github");
 
   return (
-    <AppLayout>
+    <>
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-8 select-none">
         <div>
           <h1 className="text-2xl font-black text-fg tracking-tight">Account Settings</h1>
@@ -489,6 +488,6 @@ export default function Settings() {
           </div>
         </section>
       </div>
-    </AppLayout>
+    </>
   );
 }
