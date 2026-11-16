@@ -27,7 +27,7 @@ export const envSchema = z.object({
   MAIL_FROM: z.string().optional(),
   MAIL_TRANSPORT: z.enum(["smtp", "console"]).default("console"),
   COOKIE_SECRET: z.string().optional(),
-  AI_PROVIDER: z.enum(["anthropic", "openai"]).optional(),
+  AI_PROVIDER: z.enum(["anthropic", "openai", "groq"]).optional(),
   AI_MODEL: z.string().optional(),
   AI_API_KEY: z.string().optional(),
   AI_EFFORT: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),

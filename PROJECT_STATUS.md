@@ -38,7 +38,7 @@ DevCollab combines real-time multiplayer code editing (Yjs CRDTs + Monaco Editor
 - Mailer: `backend/services/mailer.js` (Nodemailer SMTP when `MAIL_TRANSPORT=smtp` + `SMTP_URL`, otherwise log-only).
 
 ### Stage 3: AI Code Review
-- `backend/services/ai/` with Anthropic (`claude-opus-5-5` by default) and OpenAI (`gpt-4o-mini` by default) providers, selected by `AI_PROVIDER` + `AI_API_KEY` (+ optional `AI_MODEL`, `AI_EFFORT`).
+- `backend/services/ai/` with Groq (`llama-3.3-70b-versatile` by default, free tier), Anthropic (`claude-opus-5-5`) and OpenAI (`gpt-4o-mini`) providers, selected by `AI_PROVIDER` + `AI_API_KEY` (+ optional `AI_MODEL`; `AI_EFFORT` for Anthropic). Groq uses the OpenAI-compatible client with Groq's endpoint.
 - When no provider is configured, the review endpoint answers `503 AI review is not configured`; the UI shows the feature as unavailable. (A mock provider exists only for tests.)
 - Secret redaction before sending code, schema-validated JSON output with one corrective retry, findings anchored to Yjs positions so they move with edits.
 - Limits: 5 reviews/hour per user, 20/day per room, `AI_DAILY_REQUEST_LIMIT` per server per day (default 100), 20,000 characters of code.
@@ -213,7 +213,7 @@ Clients join the per-room channel `room:<roomId>` via `room:join` and are always
 | `MAIL_FROM` | | `DevCollab <noreply@devcollab.io>` | Sender address |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | | — | Google OAuth |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | | — | GitHub OAuth |
-| `AI_PROVIDER` | | — | `anthropic` or `openai`; unset disables AI review |
+| `AI_PROVIDER` | | — | `groq`, `anthropic` or `openai`; unset disables AI review |
 | `AI_API_KEY` | With AI | — | Provider API key |
 | `AI_MODEL` | | `claude-opus-5-5` / `gpt-4o-mini` | Model override |
 | `AI_EFFORT` | | `high` | Anthropic effort: `low`, `medium`, `high`, `xhigh`, `max` |

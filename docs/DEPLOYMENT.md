@@ -79,7 +79,7 @@ Because the frontend runs on `https://<your-project>.vercel.app` and the backend
    |---|---|---|
    | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | from Google Cloud Console | Google sign-in. Authorized redirect URI: `<API_URL>/auth/google/callback` |
    | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | from GitHub OAuth Apps | GitHub sign-in. Callback URL: `<API_URL>/auth/github/callback` |
-   | `AI_PROVIDER` / `AI_API_KEY` | `anthropic` or `openai` + key | Enables AI review (default models `claude-opus-5-5` / `gpt-4o-mini`; override with `AI_MODEL`) |
+   | `AI_PROVIDER` / `AI_API_KEY` | `groq`, `anthropic` or `openai` + key | Enables AI review (default models `llama-3.3-70b-versatile` / `claude-opus-5-5` / `gpt-4o-mini`; override with `AI_MODEL`). Groq has a free tier |
    | `SENTRY_DSN` | Sentry project DSN | Error reporting |
    | `METRICS_TOKEN` | random string | Enables `/metrics` behind `Authorization: Bearer <token>` |
 

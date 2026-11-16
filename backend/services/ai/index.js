@@ -1,5 +1,5 @@
 import { callAnthropic } from "./anthropic.js";
-import { callOpenAI } from "./openai.js";
+import { callOpenAI, GROQ_API_URL } from "./openai.js";
 import {
   buildSystemPrompt,
   buildUserPrompt,
@@ -10,6 +10,39 @@ import logger from "../../utils/logger.js";
 import ApiError from "../../utils/ApiError.js";
 
 let testProviderOverride = null;
+
+export const SUPPORTED_PROVIDERS = ["anthropic", "openai", "groq"];
+
+const DEFAULT_MODELS = {
+  anthropic: "claude-opus-5-5",
+  openai: "gpt-4o-mini",
+  // Groq's free tier; override with AI_MODEL (see console.groq.com/docs/models)
+  groq: "llama-3.3-70b-versatile",
+};
+
+/**
+ * Sends one request to the configured provider.
+ * `messages` (optional) is a full conversation; otherwise systemPrompt + userPrompt are used.
+ */
+async function callProvider(config, { systemPrompt, userPrompt, messages }) {
+  const { provider, apiKey, model } = config;
+  if (provider === "anthropic") {
+    return callAnthropic({ apiKey, model, systemPrompt, userPrompt, messages });
+  }
+  if (provider === "openai" || provider === "groq") {
+    // OpenAI-style APIs take the system prompt as the first message
+    const fullMessages = messages ? [{ role: "system", content: systemPrompt }, ...messages] : null;
+    return callOpenAI({
+      apiKey,
+      model,
+      systemPrompt,
+      userPrompt,
+      messages: fullMessages,
+      ...(provider === "groq" ? { apiUrl: GROQ_API_URL, label: "Groq" } : {}),
+    });
+  }
+  throw new ApiError(500, `Unsupported AI provider: ${provider}`);
+}
 
 /**
  * Set an in-memory mock provider for testing.
@@ -33,15 +66,13 @@ export function getAiConfig() {
 
   const isConfigured = Boolean(
     testProviderOverride ||
-      (provider && apiKey && (provider === "anthropic" || provider === "openai"))
+      (provider && apiKey && SUPPORTED_PROVIDERS.includes(provider))
   );
 
   return {
     configured: isConfigured,
     provider: provider || (testProviderOverride ? "mock" : null),
-    model:
-      model ||
-      (provider === "openai" ? "gpt-4o-mini" : "claude-opus-5-5"),
+    model: model || DEFAULT_MODELS[provider] || DEFAULT_MODELS.anthropic,
     apiKey,
   };
 }
@@ -88,26 +119,10 @@ export async function reviewCode({ language = "javascript", code = "", focus = "
       });
       rawText = typeof mockResult === "string" ? mockResult : JSON.stringify(mockResult);
       if (mockResult?.usage) usage = mockResult.usage;
-    } else if (providerName === "anthropic") {
-      const result = await callAnthropic({
-        apiKey: config.apiKey,
-        model: modelName,
-        systemPrompt,
-        userPrompt,
-      });
-      rawText = result.rawText;
-      usage = result.usage;
-    } else if (providerName === "openai") {
-      const result = await callOpenAI({
-        apiKey: config.apiKey,
-        model: modelName,
-        systemPrompt,
-        userPrompt,
-      });
-      rawText = result.rawText;
-      usage = result.usage;
     } else {
-      throw new ApiError(500, `Unsupported AI provider: ${providerName}`);
+      const result = await callProvider(config, { systemPrompt, userPrompt });
+      rawText = result.rawText;
+      usage = result.usage;
     }
   } catch (err) {
     const durationMs = Date.now() - startTime;
@@ -150,27 +165,10 @@ export async function reviewCode({ language = "javascript", code = "", focus = "
           isRetry: true,
         });
         rawText = typeof retryResult === "string" ? retryResult : JSON.stringify(retryResult);
-      } else if (providerName === "anthropic") {
-        const result = await callAnthropic({
-          apiKey: config.apiKey,
-          model: modelName,
+      } else {
+        const result = await callProvider(config, {
           systemPrompt,
           messages: [
-            { role: "user", content: userPrompt },
-            { role: "assistant", content: rawText || "(empty response)" },
-            { role: "user", content: correctivePrompt },
-          ],
-        });
-        rawText = result.rawText;
-        usage.inputTokens += result.usage.inputTokens;
-        usage.outputTokens += result.usage.outputTokens;
-      } else if (providerName === "openai") {
-        const result = await callOpenAI({
-          apiKey: config.apiKey,
-          model: modelName,
-          systemPrompt,
-          messages: [
-            { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
             { role: "assistant", content: rawText || "(empty response)" },
             { role: "user", content: correctivePrompt },

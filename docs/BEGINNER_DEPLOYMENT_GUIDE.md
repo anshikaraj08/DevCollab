@@ -501,23 +501,35 @@ The most common error is `redirect_uri_mismatch`. It means the URL in step 4 doe
 
 ## Part 10: Optional: AI code review
 
-The **AI Review** button sends room code to an AI model. This **costs real money per request**: you pay the AI provider, not Render.
+The **AI Review** button sends the room's code to an AI model, which returns line-by-line findings. Pick **one** provider.
 
-1. Create an account at **console.anthropic.com**, add billing credit, then go to **API Keys → Create Key** and copy it.
-2. On Render, add:
+### Option A: Groq (free, recommended to start)
+
+1. Go to **console.groq.com** and sign in (Google or GitHub works). No credit card is needed.
+2. Click **API Keys → Create API Key**, name it `devcollab-render`, and copy the key. It starts with `gsk_` and is shown only once.
+3. On Render, add:
 
    | Key | Value | Notes |
    |---|---|---|
-   | `AI_PROVIDER` | `anthropic` | (`openai` also works with an OpenAI key) |
-   | `AI_API_KEY` | your key | Secret. Never commit it |
-   | `AI_DAILY_REQUEST_LIMIT` | `20` | A hard cap per day for the whole server, so a bug or abuse can't run up a big bill |
-   | `AI_EFFORT` | `medium` | Optional. `high` (the default) gives more thorough reviews but uses more tokens; `low` is cheapest |
+   | `AI_PROVIDER` | `groq` | |
+   | `AI_API_KEY` | your `gsk_...` key | Secret. Never commit it |
+   | `AI_DAILY_REQUEST_LIMIT` | `100` | Server-wide cap per day; keeps you inside Groq's free limits |
 
-3. Save and redeploy.
+4. **Save, rebuild, and deploy.**
 
-The default model is `claude-opus-5-5`. You can set `AI_MODEL` to change it, but leave it unset unless you have a reason.
+The default model is `llama-3.3-70b-versatile`. Groq changes its model list from time to time. If reviews fail with `model_decommissioned` or `model not found` in the Render logs, open **console.groq.com/docs/models**, pick a current production model (for example `openai/gpt-oss-120b`), and set it as `AI_MODEL` on Render.
 
-Set a monthly **spend limit** in the Anthropic console (**Settings → Limits**) as a second safety net.
+**Free-tier limits:** Groq limits requests and tokens per minute and per day for each model. The current numbers for your account are under **console.groq.com → Settings → Limits**. If you hit a limit, reviews fail with a "rate limit" message until it resets. Very long files can also exceed the per-minute token limit; review a smaller file, or upgrade to Groq's paid Developer tier.
+
+### Option B: Anthropic Claude (paid, most thorough)
+
+1. Create an account at **console.anthropic.com**, add billing credit, then go to **API Keys → Create Key** and copy it.
+2. On Render, set `AI_PROVIDER` = `anthropic` and `AI_API_KEY` = your key, plus `AI_DAILY_REQUEST_LIMIT` = `20`. Optionally set `AI_EFFORT` = `medium`: `high` (the default) is more thorough but uses more tokens.
+3. Save and redeploy. The default model is `claude-opus-5-5`. Set a monthly **spend limit** in the Anthropic console (**Settings → Limits**).
+
+(`openai` with an OpenAI key also works; default model `gpt-4o-mini`.)
+
+**Privacy:** with any provider, the code in the room is sent to that company's servers. Common secret formats (API keys, private keys) are removed first, but don't review code that contains real secrets.
 
 ---
 
@@ -642,6 +654,6 @@ You should know these before you invite real users.
 - [ ] `TRUST_PROXY=1`, `MAIL_TRANSPORT=smtp`, `SMTP_URL`, `API_URL` and `COOKIE_SECRET` are set on Render
 - [ ] Your notes file is **outside** the project and not committed
 - [ ] (Optional) Google/GitHub sign-in works
-- [ ] (Optional) AI review works and a spend limit is set at the provider
+- [ ] (Optional) AI review works (and, for paid providers, a spend limit is set)
 
 For the architecture and more advanced options (Docker Compose, Redis for multiple servers, monitoring), see [DEPLOYMENT.md](./DEPLOYMENT.md). For what each security setting does, see [SECURITY.md](./SECURITY.md).

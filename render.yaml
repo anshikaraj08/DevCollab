@@ -47,7 +47,7 @@ services:
         sync: false
       - key: GITHUB_CLIENT_SECRET
         sync: false
-      # Optional: AI code review (anthropic or openai)
+      # Optional: AI code review (groq = free tier, anthropic, or openai)
       - key: AI_PROVIDER
         sync: false
       - key: AI_API_KEY

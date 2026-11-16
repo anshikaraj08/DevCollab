@@ -1,14 +1,24 @@
 /**
- * OpenAI Provider Implementation for DevCollab AI Code Review
+ * OpenAI-compatible Chat Completions provider for DevCollab AI Code Review.
+ * Used for OpenAI itself and for Groq, which exposes the same API at a different URL.
  */
 
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+export const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+export const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const TIMEOUT_MS = 60000;
 
-export async function callOpenAI({ apiKey, model = DEFAULT_OPENAI_MODEL, systemPrompt, userPrompt, messages = null }) {
+export async function callOpenAI({
+  apiKey,
+  model = DEFAULT_OPENAI_MODEL,
+  systemPrompt,
+  userPrompt,
+  messages = null,
+  apiUrl = OPENAI_API_URL,
+  label = "OpenAI",
+}) {
   if (!apiKey) {
-    throw new Error("Missing OpenAI API key");
+    throw new Error(`Missing ${label} API key`);
   }
 
   const promptMessages = messages || [
@@ -24,7 +34,7 @@ export async function callOpenAI({ apiKey, model = DEFAULT_OPENAI_MODEL, systemP
   };
 
   const executeRequest = async () => {
-    const res = await fetch(OPENAI_API_URL, {
+    const res = await fetch(apiUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -36,7 +46,7 @@ export async function callOpenAI({ apiKey, model = DEFAULT_OPENAI_MODEL, systemP
 
     if (!res.ok) {
       const errorText = await res.text().catch(() => "");
-      const error = new Error(`OpenAI API error (${res.status}): ${errorText}`);
+      const error = new Error(`${label} API error (${res.status}): ${errorText}`);
       error.status = res.status;
       throw error;
     }
